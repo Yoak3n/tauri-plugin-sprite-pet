@@ -62,9 +62,9 @@ jobs:
             exit 1
           fi
       - name: Publish
-        run: pnpm publish --no-git-checks --provenance --access public
+        run: pnpm publish --no-git-checks --access public
         env:
-          NODE_AUTH_TOKEN: ""  # Trusted Publishing uses OIDC, no static token needed
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   github-release:
     name: Create GitHub Release
