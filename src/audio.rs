@@ -67,6 +67,7 @@ impl SoundRegistry {
     }
 
     /// Check if a sound is registered for an action.
+    #[allow(dead_code)]
     pub fn has(&self, action: &str) -> bool {
         self.sounds.contains_key(action)
     }
@@ -83,11 +84,13 @@ impl SoundRegistry {
     }
 
     /// Remove a registered sound.
+    #[allow(dead_code)]
     pub fn unregister(&mut self, action: &str) {
         self.sounds.remove(action);
     }
 
     /// Clear all registered sounds.
+    #[allow(dead_code)]
     pub fn clear(&mut self) {
         self.sounds.clear();
     }
@@ -217,6 +220,7 @@ impl TtsProvider for ElevenLabsTts {
 }
 
 /// No-op TTS provider (returns empty audio).
+#[allow(dead_code)]
 pub struct NoopTts;
 
 #[async_trait]

@@ -18,6 +18,7 @@ fn default_actions() -> Vec<ActionDef> {
 #[derive(Debug)]
 pub struct ActionRegistry {
     actions: HashMap<String, ActionDef>,
+    #[allow(dead_code)]
     row_index: Vec<Option<String>>,
 }
 
@@ -60,6 +61,7 @@ impl ActionRegistry {
         self.actions.get(name)
     }
 
+    #[allow(dead_code)]
     pub fn get_by_row(&self, row: u32) -> Option<&ActionDef> {
         self.row_index
             .get(row as usize)
@@ -67,6 +69,7 @@ impl ActionRegistry {
             .and_then(|name| self.actions.get(name))
     }
 
+    #[allow(dead_code)]
     pub fn action_names(&self) -> Vec<&str> {
         self.actions.keys().map(|s| s.as_str()).collect()
     }
@@ -171,6 +174,7 @@ impl ActionPlayer {
         true
     }
 
+    #[allow(dead_code)]
     pub fn restart(&mut self) {
         self.current_frame = 0;
         self.elapsed_ms = 0;

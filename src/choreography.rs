@@ -174,10 +174,11 @@ impl SequenceExecutor {
         };
 
         // Execute the step
-        let mut cmd = SequenceCommand::default();
-
-        cmd.action = Some(step.action.clone());
-        cmd.loops = step.loops;
+        let mut cmd = SequenceCommand {
+            action: Some(step.action.clone()),
+            loops: step.loops,
+            ..Default::default()
+        };
 
         if let Some(ref sound) = step.sound {
             cmd.sound = Some(sound.clone());
@@ -253,6 +254,7 @@ impl Default for SequenceExecutor {
 #[derive(Debug, Default)]
 pub struct SequenceCommand {
     pub action: Option<String>,
+    #[allow(dead_code)]
     pub loops: Option<u32>,
     pub sound: Option<SoundTrigger>,
     pub bubble: Option<BubbleContent>,

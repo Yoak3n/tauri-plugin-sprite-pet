@@ -46,6 +46,7 @@ pub struct PetHandle {
     seq_tx: mpsc::UnboundedSender<crate::models::ActionSequence>,
     cmd_tx: mpsc::UnboundedSender<HandleCommand>,
     state: SharedPetState,
+    #[allow(dead_code)]
     state_tx: broadcast::Sender<PetState>,
     command_tx: broadcast::Sender<PetCommand>,
     shutdown_tx: watch::Sender<bool>,
@@ -125,6 +126,7 @@ impl PetHandle {
     }
 
     /// Subscribe to internal state changes (for persistence/debugging).
+    #[allow(dead_code)]
     pub fn subscribe(&self) -> broadcast::Receiver<PetState> {
         self.state_tx.subscribe()
     }
@@ -413,10 +415,8 @@ async fn run_loop(
                 });
 
                 // 6. Notify sequence if action finished
-                if player.finished && seq_exec.active {
-                    if seq_exec.on_action_finished() {
-                        // Sequence will advance on next tick
-                    }
+                if player.finished && seq_exec.active && seq_exec.on_action_finished() {
+                    // Sequence will advance on next tick
                 }
 
                 // 7. Handle non-looping action finish with hold, or pending idle switch
@@ -466,16 +466,7 @@ async fn run_loop(
                 }
 
                 // Emit render: during hold re-send current frame; otherwise on change
-                if in_hold {
-                    let _ = cmd_tx.send(PetCommand::Render {
-                        action: player.current_action.clone(),
-                        frame_index: player.current_frame,
-                        facing: format!("{:?}", facing).to_lowercase(),
-                        x: position.x,
-                        y: position.y,
-                        scale: 1.0,
-                    });
-                } else if frame_changed || player.current_action != prev_action {
+                if in_hold || frame_changed || player.current_action != prev_action {
                     let _ = cmd_tx.send(PetCommand::Render {
                         action: player.current_action.clone(),
                         frame_index: player.current_frame,
@@ -571,7 +562,7 @@ async fn handle_event(
             let row = action.map(|a| a.row).unwrap_or(0);
             let frame_rect = sprite_sheet.frames
                 .get(row as usize)
-                .and_then(|r| r.get(0))
+                .and_then(|r| r.first())
                 .copied()
                 .unwrap_or(FrameRect { x: 0, y: 0, width: 0, height: 0 });
 
@@ -638,7 +629,7 @@ async fn apply_sequence_command(
     let row = action.map(|a| a.row).unwrap_or(0);
     let frame_rect = sprite_sheet.frames
         .get(row as usize)
-        .and_then(|r| r.get(0))
+        .and_then(|r| r.first())
         .copied()
         .unwrap_or(FrameRect { x: 0, y: 0, width: 0, height: 0 });
 

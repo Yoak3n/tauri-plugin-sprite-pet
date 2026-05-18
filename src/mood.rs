@@ -74,6 +74,7 @@ pub struct PetStore {
 }
 
 impl PetStore {
+    #[allow(dead_code)]
     pub fn new(cache_dir: PathBuf) -> Self {
         Self { cache_dir }
     }
@@ -109,6 +110,7 @@ impl PetStore {
         Ok(Some(snapshot))
     }
 
+    #[allow(dead_code)]
     pub fn delete(&self, pet_id: &str) -> Result<()> {
         let path = self.snapshot_path(pet_id);
         if path.exists() {
@@ -125,9 +127,7 @@ mod tests {
 
     #[test]
     fn test_stats_clamp() {
-        let mut stats = PetStats::default();
-        stats.happiness = 150.0;
-        stats.energy = -10.0;
+        let mut stats = PetStats { happiness: 150.0, energy: -10.0, ..Default::default() };
         stats.clamp();
         assert_eq!(stats.happiness, 100.0);
         assert_eq!(stats.energy, 0.0);

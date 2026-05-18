@@ -1,7 +1,6 @@
 use crate::error::Result;
 use crate::models::{FrameLayout, FrameRect, SpriteSheet};
 use image::DynamicImage;
-use image::GenericImageView;
 use std::io::Cursor;
 use std::path::Path;
 
@@ -29,6 +28,7 @@ pub fn load_spritesheet(path: &Path, layout: FrameLayout) -> Result<SpriteSheet>
     })
 }
 
+#[allow(dead_code)]
 pub fn load_spritesheet_from_bytes(bytes: &[u8], layout: FrameLayout) -> Result<SpriteSheet> {
     let img = image::load_from_memory(bytes)?;
     Ok(SpriteSheet {
@@ -38,6 +38,7 @@ pub fn load_spritesheet_from_bytes(bytes: &[u8], layout: FrameLayout) -> Result<
     })
 }
 
+#[allow(dead_code)]
 pub fn extract_frame(sheet: &SpriteSheet, row: u32, col: u32) -> Result<DynamicImage> {
     let rect = sheet
         .frames
@@ -51,6 +52,7 @@ pub fn extract_frame(sheet: &SpriteSheet, row: u32, col: u32) -> Result<DynamicI
         .crop_imm(rect.x, rect.y, rect.width, rect.height))
 }
 
+#[allow(dead_code)]
 pub fn extract_frame_bytes(sheet: &SpriteSheet, row: u32, col: u32) -> Result<Vec<u8>> {
     let frame = extract_frame(sheet, row, col)?;
     let mut buf = Cursor::new(Vec::new());
@@ -58,6 +60,7 @@ pub fn extract_frame_bytes(sheet: &SpriteSheet, row: u32, col: u32) -> Result<Ve
     Ok(buf.into_inner())
 }
 
+#[allow(dead_code)]
 pub fn pre_extract_all(sheet: &SpriteSheet) -> Result<Vec<Vec<Vec<u8>>>> {
     let mut all = Vec::with_capacity(sheet.layout.rows as usize);
     for r in 0..sheet.layout.rows {

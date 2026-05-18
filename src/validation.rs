@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 pub struct ValidationConfig {
     pub expected_layout: Option<FrameLayout>,
     pub require_alpha: bool,
+    #[allow(dead_code)]
     pub max_atlas_bytes: u64,
 }
 
@@ -44,6 +45,7 @@ pub enum IssueSeverity {
 }
 
 /// Validate raw bytes before decoding (size check).
+#[allow(dead_code)]
 pub fn validate_bytes(bytes: &[u8], config: &ValidationConfig) -> Result<()> {
     if bytes.len() as u64 > config.max_atlas_bytes {
         return Err(crate::error::Error::Validation(vec![format!(
@@ -94,7 +96,7 @@ pub fn validate_spritesheet(
     let (w, h) = (img.width(), img.height());
     let has_alpha = img.color().has_alpha();
 
-    let detected = detect_layout(w, h).unwrap_or_else(|| FrameLayout {
+    let detected = detect_layout(w, h).unwrap_or(FrameLayout {
         columns: 1,
         rows: 1,
         cell_width: w,

@@ -153,7 +153,7 @@ impl BehaviorEngine {
 
         Some(BehaviorTick {
             action: action.action.clone(),
-            bubble: action.bubble.as_ref().map(|text| BubbleContent::action(text)),
+            bubble: action.bubble.as_ref().map(BubbleContent::action),
         })
     }
 }

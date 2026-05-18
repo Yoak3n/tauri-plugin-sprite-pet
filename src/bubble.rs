@@ -151,6 +151,7 @@ impl BubbleManager {
         self.current.as_ref().map(|s| &s.content)
     }
 
+    #[allow(dead_code)]
     pub fn is_showing(&self) -> bool {
         self.current.is_some()
     }
