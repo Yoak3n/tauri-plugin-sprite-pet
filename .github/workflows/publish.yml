@@ -40,10 +40,10 @@ jobs:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
   publish-npm:
-    name: Publish to npm
+    name: Publish to npm (Trusted Publishing)
     runs-on: ubuntu-latest
     permissions:
-      id-token: write   # Required for npm Trusted Publishing (OIDC)
+      id-token: write   # Required for npm Trusted Publishing OIDC
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -62,9 +62,7 @@ jobs:
             exit 1
           fi
       - name: Publish
-        run: pnpm publish --no-git-checks --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: pnpm publish --no-git-checks --provenance --access public
 
   github-release:
     name: Create GitHub Release
