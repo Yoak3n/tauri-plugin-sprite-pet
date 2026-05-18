@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-trigger-event"
+description = "Enables the trigger_event command without any pre-configured scope."
+commands.allow = ["trigger_event"]
+
+[[permission]]
+identifier = "deny-trigger-event"
+description = "Denies the trigger_event command without any pre-configured scope."
+commands.deny = ["trigger_event"]

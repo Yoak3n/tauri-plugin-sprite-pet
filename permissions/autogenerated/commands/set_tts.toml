@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-set-tts"
+description = "Enables the set_tts command without any pre-configured scope."
+commands.allow = ["set_tts"]
+
+[[permission]]
+identifier = "deny-set-tts"
+description = "Denies the set_tts command without any pre-configured scope."
+commands.deny = ["set_tts"]

@@ -1,0 +1,24 @@
+[default]
+description = "Default permissions for sprite-pet plugin"
+permissions = [
+    "allow-load-pet",
+    "allow-unload-pet",
+    "allow-trigger-event",
+    "allow-set-position",
+    "allow-register-sound",
+    "allow-register-sound-bytes",
+    "allow-set-tts",
+    "allow-say",
+    "allow-play-action",
+    "allow-show-bubble",
+    "allow-dismiss-bubble",
+    "allow-play-sequence",
+    "allow-stop-sequence",
+    "allow-set-behavior-config",
+    "allow-set-ambient-enabled",
+    "allow-get-stats",
+    "allow-set-stats",
+    "allow-save-state",
+    "allow-load-saved-state",
+    "allow-list-downloaded-pets",
+]
