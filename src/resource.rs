@@ -38,6 +38,7 @@ impl Default for ResourceConfig {
 
 /// Lightweight struct for deserializing codexpet.xyz pet metadata.
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct CodexpetPetMeta {
     slug: Option<String>,
     id: Option<String>,
@@ -50,9 +51,7 @@ struct CodexpetPetMeta {
     like_count: Option<u64>,
     tags: Option<Vec<String>>,
     spritesheet_url: Option<String>,
-    spritesheetUrl: Option<String>,
     download_url: Option<String>,
-    downloadUrl: Option<String>,
 }
 
 impl CodexpetPetMeta {
@@ -60,7 +59,6 @@ impl CodexpetPetMeta {
         let id = self.slug.or(self.id).unwrap_or_default();
         let spritesheet_url = self
             .spritesheet_url
-            .or(self.spritesheetUrl)
             .unwrap_or_else(|| {
                 format!("{}/api/pets/{}/spritesheet", api_base_url, id)
             });
@@ -85,10 +83,7 @@ impl CodexpetPetMeta {
             poster_url: String::new(),
             preview_url: String::new(),
             share_image_url: String::new(),
-            download_url: self
-                .download_url
-                .or(self.downloadUrl)
-                .unwrap_or_default(),
+            download_url: self.download_url.unwrap_or_default(),
             validation_report: None,
         }
     }

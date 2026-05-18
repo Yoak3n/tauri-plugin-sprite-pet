@@ -8,17 +8,20 @@ A Tauri v2 plugin for animated sprite pet desktop companions. Renders sprite she
 
 ```toml
 [dependencies]
-tauri-plugin-sprite-pet = { path = "../tauri-plugin-sprite-pet" }
+tauri-plugin-sprite-pet = "0.1"
 ```
 
 ### JavaScript (package.json)
 
-```json
-{
-  "dependencies": {
-    "tauri-plugin-sprite-pet-api": "file:../tauri-plugin-sprite-pet/guest-js"
-  }
-}
+```bash
+# pnpm
+pnpm add tauri-plugin-sprite-pet-api
+
+# npm
+npm install tauri-plugin-sprite-pet-api
+
+# yarn
+yarn add tauri-plugin-sprite-pet-api
 ```
 
 ### Register the plugin (lib.rs / main.rs)

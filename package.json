@@ -1,8 +1,15 @@
 {
   "name": "tauri-plugin-sprite-pet-api",
   "version": "0.1.0",
-  "author": "You",
-  "description": "",
+  "author": "Yoak3n",
+  "description": "JavaScript API for tauri-plugin-sprite-pet — animated sprite pet desktop companions",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Yoak3n/tauri-plugin-sprite-pet.git"
+  },
+  "homepage": "https://github.com/Yoak3n/tauri-plugin-sprite-pet",
+  "keywords": ["tauri", "plugin", "sprite", "pet", "desktop", "animation"],
   "type": "module",
   "types": "./dist-js/index.d.ts",
   "main": "./dist-js/index.cjs",
