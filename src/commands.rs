@@ -65,10 +65,10 @@ pub(crate) async fn load_pet<R: Runtime>(
 
     // Load and validate
     let layout = crate::models::FrameLayout::default();
-    let sheet = crate::sprite::load_spritesheet(&path, layout.clone())?;
+    let (img, sheet) = crate::sprite::load_spritesheet(&path, layout.clone())?;
 
     let validation_config = crate::validation::ValidationConfig::default();
-    let outcome = crate::validation::validate_spritesheet(&sheet.image, &validation_config)?;
+    let outcome = crate::validation::validate_spritesheet(&img, &validation_config)?;
 
     if !outcome.valid {
         return Err(crate::error::Error::Validation(
@@ -77,7 +77,7 @@ pub(crate) async fn load_pet<R: Runtime>(
     }
 
     // Detect actual frame counts per row from the sprite sheet
-    let row_frame_counts = crate::sprite::detect_frame_counts(&sheet.image, &layout);
+    let row_frame_counts = crate::sprite::detect_frame_counts(&img, &layout);
     let action_registry = crate::action::ActionRegistry::with_detected_frames(&row_frame_counts);
 
     // Build and persist pet config

@@ -1,13 +1,31 @@
-use image::DynamicImage;
 use serde::{Deserialize, Serialize};
 
-/// The decoded sprite sheet: raw image plus frame index.
+/// Frame index for a sprite sheet: layout info plus per-frame pixel rects.
+/// Does not hold image data — the runtime only needs coordinates, not pixels.
 #[derive(Debug)]
 pub struct SpriteSheet {
-    pub image: DynamicImage,
     pub layout: FrameLayout,
     /// frames[row][col] — each entry is the pixel rect of that frame.
     pub frames: Vec<Vec<FrameRect>>,
+}
+
+impl SpriteSheet {
+    /// Create a SpriteSheet from a layout. Builds the frame rect grid automatically.
+    pub fn new(layout: FrameLayout) -> Self {
+        let frames = (0..layout.rows)
+            .map(|r| {
+                (0..layout.columns)
+                    .map(|c| FrameRect {
+                        x: c * layout.cell_width,
+                        y: r * layout.cell_height,
+                        width: layout.cell_width,
+                        height: layout.cell_height,
+                    })
+                    .collect()
+            })
+            .collect();
+        Self { layout, frames }
+    }
 }
 
 /// Grid layout descriptor for a sprite sheet.

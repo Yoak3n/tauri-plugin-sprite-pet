@@ -1,5 +1,4 @@
 <script>
-  import { listen } from '@tauri-apps/api/event'
   import { tick } from 'svelte'
   import {
     PetRenderer, loadPet, triggerEvent,
@@ -44,24 +43,12 @@
   }
   refreshDownloadedPets()
 
-  // ─── Event Logging ────────────────────────────────────────────
+  // ─── Logging Helper ───────────────────────────────────────────
 
-  let unlistenLog = null
-
-  async function setupLogListener() {
-    if (unlistenLog) return
-    unlistenLog = await listen('pet://command', (event) => {
-      const cmd = event.payload
-      const time = new Date().toLocaleTimeString()
-      let detail = ''
-      if (cmd.type === 'render') detail = `${cmd.action} frame ${cmd.frame_index} ${cmd.facing}`
-      else if (cmd.type === 'bubble') detail = `${cmd.kind}: "${cmd.text}"`
-      else if (cmd.type === 'audio') detail = `${cmd.format} ${cmd.audio_bytes?.length || 0}B`
-      else detail = JSON.stringify(cmd).slice(0, 60)
-      logs = [{ time, type: cmd.type, detail }, ...logs].slice(0, 50)
-    })
+  function logEvent(type, detail) {
+    const time = new Date().toLocaleTimeString()
+    logs = [{ time, type, detail }, ...logs].slice(0, 50)
   }
-  setupLogListener()
 
   // ─── Actions ──────────────────────────────────────────────────
 
@@ -71,31 +58,38 @@
     loading = true
     error = ''
     try {
-      // Load pet data from backend
+      // 1) Backend: download spritesheet, validate, detect frames, start runtime
       const result = await loadPet(petId, apiProvider)
       petConfig = result.config
       loaded = true
 
-      // Wait for Svelte to render the canvas element
+      // 2) Wait for Svelte to render the canvas element
       await tick()
 
-      // Create renderer and apply the loaded result
+      // 3) Frontend: create renderer — loads image, subscribes to pet://command events
       renderer = new PetRenderer(canvasEl)
+
+      // 4) Bind callbacks: renderer receives backend events and updates UI state
       renderer.onRender = (action, frame, facing) => {
         currentAction = action
         currentFrame = frame
         facingLeft = facing === 'left'
+        logEvent('render', `${action} frame ${frame} ${facing}`)
       }
       renderer.onBubble = (text, kind) => {
         bubble = { text, kind }
+        logEvent('bubble', `${kind}: "${text}"`)
       }
       renderer.onBubbleDismiss = () => {
         bubble = null
+        logEvent('dismiss_bubble', '')
       }
       renderer.onStats = (s, mood) => {
         stats = s
         moodLabel = mood
       }
+
+      // 5) Apply the loaded result: image → events → polling
       await renderer.load(result)
       refreshDownloadedPets()
     } catch (e) {
@@ -161,6 +155,7 @@
   function onPointerDown(e) {
     dragging = true
     try { triggerEvent({ type: 'drag_start' }) } catch (_) {}
+    logEvent('event', 'drag_start')
     e.target.setPointerCapture(e.pointerId)
   }
 
@@ -173,6 +168,7 @@
     if (!dragging) return
     dragging = false
     try { triggerEvent({ type: 'drag_drop' }) } catch (_) {}
+    logEvent('event', 'drag_drop')
   }
 
   // ─── Keyboard Shortcuts ───────────────────────────────────────

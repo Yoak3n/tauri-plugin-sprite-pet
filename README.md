@@ -205,10 +205,28 @@ println!("Action: {}, Frame: {}, Finished: {}",
 
 ```rust
 use tauri_plugin_sprite_pet::{
-    start_pet, PetRuntimeConfig, PetHandle,
-    EventActionMap, BehaviorConfig, MoodConfig,
+    start_pet, PetRuntimeConfig, PetHandle, SpriteSheet, FrameLayout,
+    ActionRegistry, EventActionMap, BehaviorConfig, MoodConfig,
     models::{PetEvent, Facing},
 };
+
+// Create a SpriteSheet from the default layout (8x9 grid, 192x208 cells)
+let spritesheet = SpriteSheet::new(FrameLayout::default());
+
+// Or with a custom layout
+let spritesheet = SpriteSheet::new(FrameLayout {
+    columns: 6,
+    rows: 4,
+    cell_width: 128,
+    cell_height: 128,
+});
+
+// Or load from a spritesheet image file (for validation / frame detection)
+use tauri_plugin_sprite_pet::sprite::load_spritesheet;
+let (img, spritesheet) = load_spritesheet(
+    std::path::Path::new("path/to/spritesheet.webp"),
+    FrameLayout::default(),
+)?;
 
 // Build runtime config
 let runtime_config = PetRuntimeConfig {

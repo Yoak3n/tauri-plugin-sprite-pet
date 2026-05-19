@@ -19,27 +19,30 @@ fn build_frame_index(layout: &FrameLayout) -> Vec<Vec<FrameRect>> {
         .collect()
 }
 
-pub fn load_spritesheet(path: &Path, layout: FrameLayout) -> Result<SpriteSheet> {
+/// Load a spritesheet from a file. Returns the decoded image and the frame index.
+pub fn load_spritesheet(path: &Path, layout: FrameLayout) -> Result<(DynamicImage, SpriteSheet)> {
     let img = image::open(path)?;
-    Ok(SpriteSheet {
-        image: img,
+    let sheet = SpriteSheet {
         frames: build_frame_index(&layout),
         layout,
-    })
+    };
+    Ok((img, sheet))
 }
 
+/// Load a spritesheet from raw bytes. Returns the decoded image and the frame index.
 #[allow(dead_code)]
-pub fn load_spritesheet_from_bytes(bytes: &[u8], layout: FrameLayout) -> Result<SpriteSheet> {
+pub fn load_spritesheet_from_bytes(bytes: &[u8], layout: FrameLayout) -> Result<(DynamicImage, SpriteSheet)> {
     let img = image::load_from_memory(bytes)?;
-    Ok(SpriteSheet {
-        image: img,
+    let sheet = SpriteSheet {
         frames: build_frame_index(&layout),
         layout,
-    })
+    };
+    Ok((img, sheet))
 }
 
+/// Extract a single frame as a DynamicImage.
 #[allow(dead_code)]
-pub fn extract_frame(sheet: &SpriteSheet, row: u32, col: u32) -> Result<DynamicImage> {
+pub fn extract_frame(img: &DynamicImage, sheet: &SpriteSheet, row: u32, col: u32) -> Result<DynamicImage> {
     let rect = sheet
         .frames
         .get(row as usize)
@@ -47,26 +50,26 @@ pub fn extract_frame(sheet: &SpriteSheet, row: u32, col: u32) -> Result<DynamicI
         .ok_or_else(|| {
             crate::error::Error::InvalidAction(format!("Frame [{row}][{col}] out of bounds"))
         })?;
-    Ok(sheet
-        .image
-        .crop_imm(rect.x, rect.y, rect.width, rect.height))
+    Ok(img.crop_imm(rect.x, rect.y, rect.width, rect.height))
 }
 
+/// Extract a single frame as WebP bytes.
 #[allow(dead_code)]
-pub fn extract_frame_bytes(sheet: &SpriteSheet, row: u32, col: u32) -> Result<Vec<u8>> {
-    let frame = extract_frame(sheet, row, col)?;
+pub fn extract_frame_bytes(img: &DynamicImage, sheet: &SpriteSheet, row: u32, col: u32) -> Result<Vec<u8>> {
+    let frame = extract_frame(img, sheet, row, col)?;
     let mut buf = Cursor::new(Vec::new());
     frame.write_to(&mut buf, image::ImageFormat::WebP)?;
     Ok(buf.into_inner())
 }
 
+/// Pre-extract all frames as WebP bytes.
 #[allow(dead_code)]
-pub fn pre_extract_all(sheet: &SpriteSheet) -> Result<Vec<Vec<Vec<u8>>>> {
+pub fn pre_extract_all(img: &DynamicImage, sheet: &SpriteSheet) -> Result<Vec<Vec<Vec<u8>>>> {
     let mut all = Vec::with_capacity(sheet.layout.rows as usize);
     for r in 0..sheet.layout.rows {
         let mut row_frames = Vec::with_capacity(sheet.layout.columns as usize);
         for c in 0..sheet.layout.columns {
-            row_frames.push(extract_frame_bytes(sheet, r, c)?);
+            row_frames.push(extract_frame_bytes(img, sheet, r, c)?);
         }
         all.push(row_frames);
     }

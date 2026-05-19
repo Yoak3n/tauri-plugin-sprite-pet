@@ -1,6 +1,6 @@
 {
   "name": "tauri-plugin-sprite-pet-api",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "author": "Yoak3n",
   "description": "JavaScript API for tauri-plugin-sprite-pet — animated sprite pet desktop companions",
   "license": "MIT",

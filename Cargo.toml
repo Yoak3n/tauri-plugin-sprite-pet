@@ -1,6 +1,6 @@
 [package]
 name = "tauri-plugin-sprite-pet"
-version = "0.1.8"
+version = "0.1.9"
 authors = ["Yoak3n"]
 description = "Tauri plugin for animated sprite pet desktop companions"
 license = "MIT"
