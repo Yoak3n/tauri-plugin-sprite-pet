@@ -6,26 +6,37 @@ use tauri::{
 pub use models::*;
 
 #[cfg(desktop)]
-mod desktop;
+pub mod desktop;
 #[cfg(mobile)]
 mod mobile;
 
-mod action;
-mod audio;
-mod behavior;
-mod bubble;
-mod choreography;
+pub mod action;
+pub mod audio;
+pub mod behavior;
+pub mod bubble;
+pub mod choreography;
 mod commands;
-mod error;
-mod event;
+pub mod error;
+pub mod event;
 mod models;
-mod mood;
-mod resource;
-mod runtime;
-mod sprite;
-mod validation;
+pub mod mood;
+pub mod resource;
+pub mod runtime;
+pub mod sprite;
+pub mod validation;
 
 pub use error::{Error, Result};
+
+// Re-export key types for convenience
+pub use action::{ActionPlayer, ActionRegistry};
+pub use audio::SoundRegistry;
+pub use behavior::BehaviorEngine;
+pub use bubble::{BubbleContent, BubbleManager, BubblePriority};
+pub use choreography::SequenceExecutor;
+pub use event::EventActionMap;
+pub use mood::{MoodTracker, PetStore};
+pub use resource::{ResourceClient, ResourceConfig, ResourceProvider};
+pub use runtime::{start_pet, PetHandle, PetRuntimeConfig, SharedPetState};
 
 /// Initializes the plugin.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
@@ -57,6 +68,18 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::save_state,
             commands::load_saved_state,
             commands::list_downloaded_pets,
+            // Query
+            commands::get_state,
+            commands::get_pet_meta,
+            commands::get_actions,
+            commands::get_position,
+            commands::list_remote_pets,
+            commands::search_remote_pets,
+            // Mutation
+            commands::delete_saved_state,
+            commands::clear_cache,
+            commands::set_mood_config,
+            commands::set_event_binding,
         ])
         .setup(|app, api| {
             #[cfg(desktop)]

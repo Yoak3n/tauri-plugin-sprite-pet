@@ -114,7 +114,6 @@ impl ResourceClient {
     }
 
     /// Fetch paginated pet listing (codex-pets.net only).
-    #[allow(dead_code)]
     pub async fn list_pets(&self, page: u32, page_size: u32) -> Result<PetListResponse> {
         let url = format!(
             "{}/api/pets?page={}&pageSize={}",
@@ -126,7 +125,6 @@ impl ResourceClient {
     }
 
     /// Search pets by query string (codex-pets.net only).
-    #[allow(dead_code)]
     pub async fn search_pets(
         &self,
         query: &str,
@@ -280,7 +278,6 @@ impl ResourceClient {
     }
 
     /// Clear the local cache for a specific pet or all pets.
-    #[allow(dead_code)]
     pub async fn clear_cache(&self, pet_id: Option<&str>) -> Result<()> {
         let target = match pet_id {
             Some(id) => self.config.cache_dir.join(id),

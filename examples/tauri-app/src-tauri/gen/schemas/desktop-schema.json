@@ -2193,16 +2193,52 @@
           "markdownDescription": "Denies the unminimize command without any pre-configured scope."
         },
         {
-          "description": "Default permissions for sprite-pet plugin\n#### This default permission set includes:\n\n- `allow-load-pet`\n- `allow-unload-pet`\n- `allow-trigger-event`\n- `allow-set-position`\n- `allow-register-sound`\n- `allow-register-sound-bytes`\n- `allow-set-tts`\n- `allow-say`\n- `allow-play-action`\n- `allow-show-bubble`\n- `allow-dismiss-bubble`\n- `allow-play-sequence`\n- `allow-stop-sequence`\n- `allow-set-behavior-config`\n- `allow-set-ambient-enabled`\n- `allow-get-stats`\n- `allow-set-stats`\n- `allow-save-state`\n- `allow-load-saved-state`\n- `allow-list-downloaded-pets`",
+          "description": "Default permissions for sprite-pet plugin\n#### This default permission set includes:\n\n- `allow-load-pet`\n- `allow-unload-pet`\n- `allow-trigger-event`\n- `allow-set-position`\n- `allow-register-sound`\n- `allow-register-sound-bytes`\n- `allow-set-tts`\n- `allow-say`\n- `allow-play-action`\n- `allow-show-bubble`\n- `allow-dismiss-bubble`\n- `allow-play-sequence`\n- `allow-stop-sequence`\n- `allow-set-behavior-config`\n- `allow-set-ambient-enabled`\n- `allow-get-stats`\n- `allow-set-stats`\n- `allow-save-state`\n- `allow-load-saved-state`\n- `allow-list-downloaded-pets`\n- `allow-get-state`\n- `allow-get-pet-meta`\n- `allow-get-actions`\n- `allow-get-position`\n- `allow-list-remote-pets`\n- `allow-search-remote-pets`\n- `allow-delete-saved-state`\n- `allow-clear-cache`\n- `allow-set-mood-config`\n- `allow-set-event-binding`",
           "type": "string",
           "const": "sprite-pet:default",
-          "markdownDescription": "Default permissions for sprite-pet plugin\n#### This default permission set includes:\n\n- `allow-load-pet`\n- `allow-unload-pet`\n- `allow-trigger-event`\n- `allow-set-position`\n- `allow-register-sound`\n- `allow-register-sound-bytes`\n- `allow-set-tts`\n- `allow-say`\n- `allow-play-action`\n- `allow-show-bubble`\n- `allow-dismiss-bubble`\n- `allow-play-sequence`\n- `allow-stop-sequence`\n- `allow-set-behavior-config`\n- `allow-set-ambient-enabled`\n- `allow-get-stats`\n- `allow-set-stats`\n- `allow-save-state`\n- `allow-load-saved-state`\n- `allow-list-downloaded-pets`"
+          "markdownDescription": "Default permissions for sprite-pet plugin\n#### This default permission set includes:\n\n- `allow-load-pet`\n- `allow-unload-pet`\n- `allow-trigger-event`\n- `allow-set-position`\n- `allow-register-sound`\n- `allow-register-sound-bytes`\n- `allow-set-tts`\n- `allow-say`\n- `allow-play-action`\n- `allow-show-bubble`\n- `allow-dismiss-bubble`\n- `allow-play-sequence`\n- `allow-stop-sequence`\n- `allow-set-behavior-config`\n- `allow-set-ambient-enabled`\n- `allow-get-stats`\n- `allow-set-stats`\n- `allow-save-state`\n- `allow-load-saved-state`\n- `allow-list-downloaded-pets`\n- `allow-get-state`\n- `allow-get-pet-meta`\n- `allow-get-actions`\n- `allow-get-position`\n- `allow-list-remote-pets`\n- `allow-search-remote-pets`\n- `allow-delete-saved-state`\n- `allow-clear-cache`\n- `allow-set-mood-config`\n- `allow-set-event-binding`"
+        },
+        {
+          "description": "Enables the clear_cache command without any pre-configured scope.",
+          "type": "string",
+          "const": "sprite-pet:allow-clear-cache",
+          "markdownDescription": "Enables the clear_cache command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the delete_saved_state command without any pre-configured scope.",
+          "type": "string",
+          "const": "sprite-pet:allow-delete-saved-state",
+          "markdownDescription": "Enables the delete_saved_state command without any pre-configured scope."
         },
         {
           "description": "Enables the dismiss_bubble command without any pre-configured scope.",
           "type": "string",
           "const": "sprite-pet:allow-dismiss-bubble",
           "markdownDescription": "Enables the dismiss_bubble command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the get_actions command without any pre-configured scope.",
+          "type": "string",
+          "const": "sprite-pet:allow-get-actions",
+          "markdownDescription": "Enables the get_actions command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the get_pet_meta command without any pre-configured scope.",
+          "type": "string",
+          "const": "sprite-pet:allow-get-pet-meta",
+          "markdownDescription": "Enables the get_pet_meta command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the get_position command without any pre-configured scope.",
+          "type": "string",
+          "const": "sprite-pet:allow-get-position",
+          "markdownDescription": "Enables the get_position command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the get_state command without any pre-configured scope.",
+          "type": "string",
+          "const": "sprite-pet:allow-get-state",
+          "markdownDescription": "Enables the get_state command without any pre-configured scope."
         },
         {
           "description": "Enables the get_stats command without any pre-configured scope.",
@@ -2215,6 +2251,12 @@
           "type": "string",
           "const": "sprite-pet:allow-list-downloaded-pets",
           "markdownDescription": "Enables the list_downloaded_pets command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the list_remote_pets command without any pre-configured scope.",
+          "type": "string",
+          "const": "sprite-pet:allow-list-remote-pets",
+          "markdownDescription": "Enables the list_remote_pets command without any pre-configured scope."
         },
         {
           "description": "Enables the load_pet command without any pre-configured scope.",
@@ -2271,6 +2313,12 @@
           "markdownDescription": "Enables the say command without any pre-configured scope."
         },
         {
+          "description": "Enables the search_remote_pets command without any pre-configured scope.",
+          "type": "string",
+          "const": "sprite-pet:allow-search-remote-pets",
+          "markdownDescription": "Enables the search_remote_pets command without any pre-configured scope."
+        },
+        {
           "description": "Enables the set_ambient_enabled command without any pre-configured scope.",
           "type": "string",
           "const": "sprite-pet:allow-set-ambient-enabled",
@@ -2281,6 +2329,18 @@
           "type": "string",
           "const": "sprite-pet:allow-set-behavior-config",
           "markdownDescription": "Enables the set_behavior_config command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the set_event_binding command without any pre-configured scope.",
+          "type": "string",
+          "const": "sprite-pet:allow-set-event-binding",
+          "markdownDescription": "Enables the set_event_binding command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the set_mood_config command without any pre-configured scope.",
+          "type": "string",
+          "const": "sprite-pet:allow-set-mood-config",
+          "markdownDescription": "Enables the set_mood_config command without any pre-configured scope."
         },
         {
           "description": "Enables the set_position command without any pre-configured scope.",
@@ -2325,10 +2385,46 @@
           "markdownDescription": "Enables the unload_pet command without any pre-configured scope."
         },
         {
+          "description": "Denies the clear_cache command without any pre-configured scope.",
+          "type": "string",
+          "const": "sprite-pet:deny-clear-cache",
+          "markdownDescription": "Denies the clear_cache command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the delete_saved_state command without any pre-configured scope.",
+          "type": "string",
+          "const": "sprite-pet:deny-delete-saved-state",
+          "markdownDescription": "Denies the delete_saved_state command without any pre-configured scope."
+        },
+        {
           "description": "Denies the dismiss_bubble command without any pre-configured scope.",
           "type": "string",
           "const": "sprite-pet:deny-dismiss-bubble",
           "markdownDescription": "Denies the dismiss_bubble command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the get_actions command without any pre-configured scope.",
+          "type": "string",
+          "const": "sprite-pet:deny-get-actions",
+          "markdownDescription": "Denies the get_actions command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the get_pet_meta command without any pre-configured scope.",
+          "type": "string",
+          "const": "sprite-pet:deny-get-pet-meta",
+          "markdownDescription": "Denies the get_pet_meta command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the get_position command without any pre-configured scope.",
+          "type": "string",
+          "const": "sprite-pet:deny-get-position",
+          "markdownDescription": "Denies the get_position command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the get_state command without any pre-configured scope.",
+          "type": "string",
+          "const": "sprite-pet:deny-get-state",
+          "markdownDescription": "Denies the get_state command without any pre-configured scope."
         },
         {
           "description": "Denies the get_stats command without any pre-configured scope.",
@@ -2341,6 +2437,12 @@
           "type": "string",
           "const": "sprite-pet:deny-list-downloaded-pets",
           "markdownDescription": "Denies the list_downloaded_pets command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the list_remote_pets command without any pre-configured scope.",
+          "type": "string",
+          "const": "sprite-pet:deny-list-remote-pets",
+          "markdownDescription": "Denies the list_remote_pets command without any pre-configured scope."
         },
         {
           "description": "Denies the load_pet command without any pre-configured scope.",
@@ -2397,6 +2499,12 @@
           "markdownDescription": "Denies the say command without any pre-configured scope."
         },
         {
+          "description": "Denies the search_remote_pets command without any pre-configured scope.",
+          "type": "string",
+          "const": "sprite-pet:deny-search-remote-pets",
+          "markdownDescription": "Denies the search_remote_pets command without any pre-configured scope."
+        },
+        {
           "description": "Denies the set_ambient_enabled command without any pre-configured scope.",
           "type": "string",
           "const": "sprite-pet:deny-set-ambient-enabled",
@@ -2407,6 +2515,18 @@
           "type": "string",
           "const": "sprite-pet:deny-set-behavior-config",
           "markdownDescription": "Denies the set_behavior_config command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the set_event_binding command without any pre-configured scope.",
+          "type": "string",
+          "const": "sprite-pet:deny-set-event-binding",
+          "markdownDescription": "Denies the set_event_binding command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the set_mood_config command without any pre-configured scope.",
+          "type": "string",
+          "const": "sprite-pet:deny-set-mood-config",
+          "markdownDescription": "Denies the set_mood_config command without any pre-configured scope."
         },
         {
           "description": "Denies the set_position command without any pre-configured scope.",

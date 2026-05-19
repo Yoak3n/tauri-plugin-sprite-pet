@@ -24,6 +24,16 @@ Default permissions for sprite-pet plugin
 - `allow-save-state`
 - `allow-load-saved-state`
 - `allow-list-downloaded-pets`
+- `allow-get-state`
+- `allow-get-pet-meta`
+- `allow-get-actions`
+- `allow-get-position`
+- `allow-list-remote-pets`
+- `allow-search-remote-pets`
+- `allow-delete-saved-state`
+- `allow-clear-cache`
+- `allow-set-mood-config`
+- `allow-set-event-binding`
 
 ## Permission Table
 
@@ -33,6 +43,58 @@ Default permissions for sprite-pet plugin
 <th>Description</th>
 </tr>
 
+
+<tr>
+<td>
+
+`sprite-pet:allow-clear-cache`
+
+</td>
+<td>
+
+Enables the clear_cache command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`sprite-pet:deny-clear-cache`
+
+</td>
+<td>
+
+Denies the clear_cache command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`sprite-pet:allow-delete-saved-state`
+
+</td>
+<td>
+
+Enables the delete_saved_state command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`sprite-pet:deny-delete-saved-state`
+
+</td>
+<td>
+
+Denies the delete_saved_state command without any pre-configured scope.
+
+</td>
+</tr>
 
 <tr>
 <td>
@@ -56,6 +118,110 @@ Enables the dismiss_bubble command without any pre-configured scope.
 <td>
 
 Denies the dismiss_bubble command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`sprite-pet:allow-get-actions`
+
+</td>
+<td>
+
+Enables the get_actions command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`sprite-pet:deny-get-actions`
+
+</td>
+<td>
+
+Denies the get_actions command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`sprite-pet:allow-get-pet-meta`
+
+</td>
+<td>
+
+Enables the get_pet_meta command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`sprite-pet:deny-get-pet-meta`
+
+</td>
+<td>
+
+Denies the get_pet_meta command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`sprite-pet:allow-get-position`
+
+</td>
+<td>
+
+Enables the get_position command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`sprite-pet:deny-get-position`
+
+</td>
+<td>
+
+Denies the get_position command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`sprite-pet:allow-get-state`
+
+</td>
+<td>
+
+Enables the get_state command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`sprite-pet:deny-get-state`
+
+</td>
+<td>
+
+Denies the get_state command without any pre-configured scope.
 
 </td>
 </tr>
@@ -108,6 +274,32 @@ Enables the list_downloaded_pets command without any pre-configured scope.
 <td>
 
 Denies the list_downloaded_pets command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`sprite-pet:allow-list-remote-pets`
+
+</td>
+<td>
+
+Enables the list_remote_pets command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`sprite-pet:deny-list-remote-pets`
+
+</td>
+<td>
+
+Denies the list_remote_pets command without any pre-configured scope.
 
 </td>
 </tr>
@@ -349,6 +541,32 @@ Denies the say command without any pre-configured scope.
 <tr>
 <td>
 
+`sprite-pet:allow-search-remote-pets`
+
+</td>
+<td>
+
+Enables the search_remote_pets command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`sprite-pet:deny-search-remote-pets`
+
+</td>
+<td>
+
+Denies the search_remote_pets command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `sprite-pet:allow-set-ambient-enabled`
 
 </td>
@@ -394,6 +612,58 @@ Enables the set_behavior_config command without any pre-configured scope.
 <td>
 
 Denies the set_behavior_config command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`sprite-pet:allow-set-event-binding`
+
+</td>
+<td>
+
+Enables the set_event_binding command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`sprite-pet:deny-set-event-binding`
+
+</td>
+<td>
+
+Denies the set_event_binding command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`sprite-pet:allow-set-mood-config`
+
+</td>
+<td>
+
+Enables the set_mood_config command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`sprite-pet:deny-set-mood-config`
+
+</td>
+<td>
+
+Denies the set_mood_config command without any pre-configured scope.
 
 </td>
 </tr>

@@ -5,8 +5,8 @@ use crate::bubble::{BubbleContent, BubbleManager};
 use crate::choreography::{SequenceCommand, SequenceExecutor};
 use crate::event::EventActionMap;
 use crate::models::{
-    BubbleSnapshot, Facing, FrameRect, MoodConfig, PetCommand, PetEvent, PetSnapshot, PetStats,
-    PetState, Position, SpriteSheet,
+    ActionDef, BubbleSnapshot, Facing, FrameRect, MoodConfig, PetCommand, PetEvent, PetSnapshot,
+    PetStats, PetState, Position, PositionInfo, SpriteSheet,
 };
 use crate::mood::{MoodTracker, PetStore};
 use std::sync::Arc;
@@ -50,6 +50,9 @@ pub struct PetHandle {
     state_tx: broadcast::Sender<PetState>,
     command_tx: broadcast::Sender<PetCommand>,
     shutdown_tx: watch::Sender<bool>,
+    position: Arc<RwLock<Position>>,
+    facing: Arc<RwLock<Facing>>,
+    action_registry: Arc<RwLock<ActionRegistry>>,
 }
 
 /// Internal commands from PetHandle to run_loop.
@@ -60,6 +63,8 @@ enum HandleCommand {
     SetBehaviorEnabled(bool),
     SetBehaviorConfig(crate::models::BehaviorConfig),
     SetStats(PetStats),
+    SetMoodConfig(MoodConfig),
+    SetEventBinding { event_key: String, action: String },
     Interaction,
     SaveState,
 }
@@ -140,6 +145,33 @@ impl PetHandle {
     pub fn set_position(&self, x: f64, y: f64) {
         let _ = self.cmd_tx.send(HandleCommand::SetPosition(x, y));
     }
+
+    /// Get the current position and facing.
+    pub async fn get_position(&self) -> PositionInfo {
+        let pos = self.position.read().await;
+        let facing = self.facing.read().await;
+        PositionInfo {
+            x: pos.x,
+            y: pos.y,
+            facing: *facing,
+        }
+    }
+
+    /// Get the list of available actions.
+    pub async fn get_actions(&self) -> Vec<ActionDef> {
+        let registry = self.action_registry.read().await;
+        registry.action_defs()
+    }
+
+    /// Update mood config at runtime.
+    pub fn set_mood_config(&self, config: MoodConfig) {
+        let _ = self.cmd_tx.send(HandleCommand::SetMoodConfig(config));
+    }
+
+    /// Update an event-to-action binding at runtime.
+    pub fn set_event_binding(&self, event_key: String, action: String) {
+        let _ = self.cmd_tx.send(HandleCommand::SetEventBinding { event_key, action });
+    }
 }
 
 /// Create and start a pet runtime. Returns a handle for interacting with it.
@@ -188,6 +220,11 @@ pub fn start_pet(
 
     let sound_registry = config.sound_registry.unwrap_or_default();
 
+    let position = Arc::new(RwLock::new(Position { x: 0.0, y: 0.0 }));
+    let facing = Arc::new(RwLock::new(Facing::Right));
+    let action_registry = Arc::new(RwLock::new(config.action_registry));
+    let event_map = Arc::new(RwLock::new(config.event_map));
+
     let handle = PetHandle {
         event_tx,
         bubble_tx,
@@ -197,6 +234,9 @@ pub fn start_pet(
         state_tx: state_tx.clone(),
         command_tx: command_tx.clone(),
         shutdown_tx,
+        position: position.clone(),
+        facing: facing.clone(),
+        action_registry: action_registry.clone(),
     };
 
     let pet_store = PetStore::default_store();
@@ -204,8 +244,8 @@ pub fn start_pet(
     tokio::spawn(run_loop(
         pet_id,
         Arc::new(sprite_sheet),
-        config.action_registry,
-        config.event_map,
+        action_registry,
+        event_map,
         ActionPlayer::new(initial_action),
         state,
         state_tx,
@@ -215,8 +255,8 @@ pub fn start_pet(
         seq_rx,
         cmd_rx,
         shutdown_rx,
-        Position { x: 0.0, y: 0.0 },
-        Facing::Right,
+        position,
+        facing,
         behavior_engine,
         mood_tracker,
         BubbleManager::new(),
@@ -233,8 +273,8 @@ pub fn start_pet(
 async fn run_loop(
     pet_id: String,
     sprite_sheet: Arc<SpriteSheet>,
-    action_registry: ActionRegistry,
-    event_map: EventActionMap,
+    action_registry: Arc<RwLock<ActionRegistry>>,
+    event_map: Arc<RwLock<EventActionMap>>,
     mut player: ActionPlayer,
     state: SharedPetState,
     state_tx: broadcast::Sender<PetState>,
@@ -244,8 +284,8 @@ async fn run_loop(
     mut seq_rx: mpsc::UnboundedReceiver<crate::models::ActionSequence>,
     mut internal_cmd_rx: mpsc::UnboundedReceiver<HandleCommand>,
     mut shutdown_rx: watch::Receiver<bool>,
-    mut position: Position,
-    mut facing: Facing,
+    shared_position: Arc<RwLock<Position>>,
+    shared_facing: Arc<RwLock<Facing>>,
     mut behavior: BehaviorEngine,
     mut mood: MoodTracker,
     mut bubble_mgr: BubbleManager,
@@ -253,6 +293,8 @@ async fn run_loop(
     pet_store: PetStore,
     sound_registry: SoundRegistry,
 ) {
+    let mut position = *shared_position.read().await;
+    let mut facing = *shared_facing.read().await;
     let mut last_tick = tokio::time::Instant::now();
     let mut last_save = tokio::time::Instant::now();
     let save_interval = tokio::time::Duration::from_secs(60);
@@ -261,7 +303,7 @@ async fn run_loop(
     let mut last_frame_hold_remaining_ms: u64 = 0;
 
     loop {
-        let frame_duration = action_registry
+        let frame_duration = action_registry.read().await
             .get(&player.current_action)
             .map(|a| a.frame_duration_ms)
             .unwrap_or(100);
@@ -280,12 +322,17 @@ async fn run_loop(
 
             // User events
             Some(event) = event_rx.recv() => {
+                let action_reg = action_registry.read().await;
+                let evt_map = event_map.read().await;
                 handle_event(
-                    &event, &event_map, &action_registry, &mut player,
+                    &event, &evt_map, &action_reg, &mut player,
                     &mut position, &mut facing, &mut behavior, &mood,
                     &state, &state_tx, &cmd_tx, &pet_id, &sprite_sheet,
                     &mut last_frame_hold_remaining_ms, &mut pending_idle_switch,
                 ).await;
+                // Sync position/facing to shared state
+                *shared_position.write().await = position;
+                *shared_facing.write().await = facing;
             }
 
             // Bubble commands
@@ -330,6 +377,7 @@ async fn run_loop(
                 match cmd {
                     HandleCommand::SetPosition(x, y) => {
                         position = Position { x, y };
+                        *shared_position.write().await = position;
                     }
                     HandleCommand::DismissBubble => {
                         bubble_mgr.dismiss();
@@ -346,6 +394,12 @@ async fn run_loop(
                     }
                     HandleCommand::SetStats(new_stats) => {
                         mood.stats = new_stats;
+                    }
+                    HandleCommand::SetMoodConfig(config) => {
+                        mood.config = config;
+                    }
+                    HandleCommand::SetEventBinding { event_key, action } => {
+                        event_map.write().await.bind(&event_key, &action);
                     }
                     HandleCommand::Interaction => {
                         behavior.on_interaction();
@@ -374,7 +428,8 @@ async fn run_loop(
                 }
 
                 // 1. Tick animation (skip during hold)
-                let frame_changed = if in_hold { false } else { player.tick(delta_ms, &action_registry) };
+                let action_reg = action_registry.read().await;
+                let frame_changed = if in_hold { false } else { player.tick(delta_ms, &action_reg) };
 
                 // 2. Tick mood
                 mood.set_idle(behavior.in_ambient_mode);
@@ -382,7 +437,7 @@ async fn run_loop(
 
                 // 3. Tick behavior engine (autonomous actions) - still runs during hold
                 if let Some(BehaviorTick { action, bubble }) = behavior.tick(&mood.stats) {
-                    if player.switch_to(&action, &action_registry) {
+                    if player.switch_to(&action, &action_reg) {
                         last_frame_hold_remaining_ms = 0;
                         pending_idle_switch = false;
                         if let Some(b) = bubble {
@@ -401,7 +456,7 @@ async fn run_loop(
                     last_frame_hold_remaining_ms = 0;
                     pending_idle_switch = false;
                     apply_sequence_command(
-                        seq_cmd, &action_registry, &mut player,
+                        seq_cmd, &action_reg, &mut player,
                         &mut bubble_mgr, &state, &state_tx, &cmd_tx, &pet_id, &sprite_sheet,
                         position, facing, &mood,
                     ).await;
@@ -428,7 +483,7 @@ async fn run_loop(
                         });
 
                         // Start hold: use action's configured hold or default 200ms
-                        let hold_ms = action_registry
+                        let hold_ms = action_reg
                             .get(&player.current_action)
                             .and_then(|a| a.last_frame_hold_ms)
                             .unwrap_or(200);
@@ -443,7 +498,7 @@ async fn run_loop(
 
                     if pending_idle_switch {
                         pending_idle_switch = false;
-                        player.switch_to("idle", &action_registry);
+                        player.switch_to("idle", &action_reg);
                     }
                 } else if last_frame_hold_remaining_ms == 0 {
                     // Hold just expired
@@ -478,7 +533,7 @@ async fn run_loop(
                 }
 
                 // 9. Update internal state
-                let action = action_registry.get(&player.current_action);
+                let action = action_reg.get(&player.current_action);
                 let row = action.map(|a| a.row).unwrap_or(0);
                 let frame_rect = sprite_sheet.frames
                     .get(row as usize)

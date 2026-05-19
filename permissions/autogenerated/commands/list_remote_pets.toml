@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-list-remote-pets"
+description = "Enables the list_remote_pets command without any pre-configured scope."
+commands.allow = ["list_remote_pets"]
+
+[[permission]]
+identifier = "deny-list-remote-pets"
+description = "Denies the list_remote_pets command without any pre-configured scope."
+commands.deny = ["list_remote_pets"]

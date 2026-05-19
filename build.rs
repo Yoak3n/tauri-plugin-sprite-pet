@@ -19,6 +19,16 @@ const COMMANDS: &[&str] = &[
     "save_state",
     "load_saved_state",
     "list_downloaded_pets",
+    "get_state",
+    "get_pet_meta",
+    "get_actions",
+    "get_position",
+    "list_remote_pets",
+    "search_remote_pets",
+    "delete_saved_state",
+    "clear_cache",
+    "set_mood_config",
+    "set_event_binding",
 ];
 
 fn main() {

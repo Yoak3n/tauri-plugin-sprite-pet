@@ -1,9 +1,10 @@
 <script>
   import { listen } from '@tauri-apps/api/event'
+  import { tick } from 'svelte'
   import {
-    loadPet, unloadPet, triggerEvent, setPosition,
+    PetRenderer, loadPet, triggerEvent,
     playAction, say, showBubble, dismissBubble,
-    setAmbientEnabled, getStats, playSequence,
+    setAmbientEnabled, playSequence,
     listDownloadedPets,
   } from 'tauri-plugin-sprite-pet-api'
 
@@ -16,13 +17,11 @@
   let petConfig = $state(null)
   let error = $state('')
 
-  let spritesheetUrl = $state('')
   let currentAction = $state('idle')
   let currentFrame = $state(0)
   let facingLeft = $state(false)
 
   let bubble = $state(null)
-  let bubbleTimeout = null
 
   let stats = $state({ happiness: 70, energy: 80, social: 50, boredom: 30 })
   let moodLabel = $state('neutral')
@@ -30,163 +29,39 @@
 
   let bubbleText = $state('Hello!')
   let logs = $state([])
-  let statsInterval = null
 
   let downloadedPets = $state([])
 
-  // ─── Canvas Rendering ────────────────────────────────────────
+  // ─── Canvas & Renderer ────────────────────────────────────────
 
   let canvasEl = $state(null)
-  let spriteImage = null
-  let configRef = null
-  let renderAction = 'idle'
-  let renderFrame = 0
-  let renderFacing = 'right'
-  let rendering = false
+  let renderer = null
 
-  function startRenderLoop() {
-    if (rendering) return
-    rendering = true
-    function loop() {
-      if (!rendering) return
-      drawFrame(renderAction, renderFrame, renderFacing)
-      requestAnimationFrame(loop)
-    }
-    requestAnimationFrame(loop)
-  }
-
-  function stopRenderLoop() {
-    rendering = false
-  }
-
-  function drawFrame(action, frame, facing) {
-    const canvas = canvasEl
-    const img = spriteImage
-    const config = configRef
-    if (!canvas || !img || !img.complete || !config) return
-
-    const actionDef = config.actions.find(a => a.name === action)
-    if (!actionDef) return
-
-    const ctx = canvas.getContext('2d')
-    const cellW = config.layout.cellWidth
-    const cellH = config.layout.cellHeight
-    const col = Math.min(frame, actionDef.frameCount - 1)
-    const sx = col * cellW
-    const sy = actionDef.row * cellH
-
-    ctx.clearRect(0, 0, cellW, cellH)
-    ctx.save()
-    if (facing === 'left') {
-      ctx.translate(cellW, 0)
-      ctx.scale(-1, 1)
-    }
-    ctx.drawImage(img, sx, sy, cellW, cellH, 0, 0, cellW, cellH)
-    ctx.restore()
-  }
-
-  // ─── Init: load downloaded pets list ──────────────────────────
+  // ─── Init ─────────────────────────────────────────────────────
 
   async function refreshDownloadedPets() {
-    try {
-      downloadedPets = await listDownloadedPets()
-    } catch (_) {}
+    try { downloadedPets = await listDownloadedPets() } catch (_) {}
   }
-
   refreshDownloadedPets()
 
-  // ─── Event Listener ───────────────────────────────────────────
+  // ─── Event Logging ────────────────────────────────────────────
 
-  let unlistenFn = null
-  let lastRenderKey = ''
+  let unlistenLog = null
 
-  async function setupListener() {
-    if (unlistenFn) return
-    unlistenFn = await listen('pet://command', (event) => {
+  async function setupLogListener() {
+    if (unlistenLog) return
+    unlistenLog = await listen('pet://command', (event) => {
       const cmd = event.payload
-      logEvent(cmd)
-
-      try {
-        switch (cmd.type) {
-          case 'render': {
-            const key = `${cmd.action}:${cmd.frame_index}:${cmd.facing}`
-            if (key === lastRenderKey) break
-            lastRenderKey = key
-            currentAction = cmd.action
-            currentFrame = cmd.frame_index
-            facingLeft = cmd.facing === 'left'
-            renderAction = cmd.action
-            renderFrame = cmd.frame_index
-            renderFacing = cmd.facing
-            break
-          }
-          case 'bubble':
-            showBubbleUI(cmd.text, cmd.kind, cmd.duration_ms)
-            break
-          case 'dismiss_bubble':
-            clearBubble()
-            break
-          case 'audio':
-            playAudio(cmd.audio_bytes, cmd.format)
-            break
-          case 'action_finished':
-            // Non-looping action completed - last frame is being held
-            break
-        }
-      } catch (e) {
-        console.error('Error handling pet command:', cmd.type, e)
-      }
+      const time = new Date().toLocaleTimeString()
+      let detail = ''
+      if (cmd.type === 'render') detail = `${cmd.action} frame ${cmd.frame_index} ${cmd.facing}`
+      else if (cmd.type === 'bubble') detail = `${cmd.kind}: "${cmd.text}"`
+      else if (cmd.type === 'audio') detail = `${cmd.format} ${cmd.audio_bytes?.length || 0}B`
+      else detail = JSON.stringify(cmd).slice(0, 60)
+      logs = [{ time, type: cmd.type, detail }, ...logs].slice(0, 50)
     })
   }
-
-  setupListener()
-
-  // ─── Bubble ───────────────────────────────────────────────────
-
-  function showBubbleUI(text, kind, durationMs) {
-    clearBubble()
-    bubble = { text, kind: kind || 'speech' }
-    if (durationMs > 0) {
-      bubbleTimeout = setTimeout(() => { bubble = null }, durationMs)
-    }
-  }
-
-  function clearBubble() {
-    if (bubbleTimeout) {
-      clearTimeout(bubbleTimeout)
-      bubbleTimeout = null
-    }
-    bubble = null
-  }
-
-  // ─── Audio ────────────────────────────────────────────────────
-
-  function playAudio(audioBytes, format) {
-    try {
-      const mime = format === 'mp3' ? 'audio/mpeg' : format === 'ogg' ? 'audio/ogg' : 'audio/wav'
-      const bytes = new Uint8Array(audioBytes)
-      const blob = new Blob([bytes], { type: mime })
-      const url = URL.createObjectURL(blob)
-      const audio = new Audio(url)
-      audio.play().catch(() => {})
-      audio.onended = () => URL.revokeObjectURL(url)
-    } catch (e) {
-      console.warn('Audio playback failed:', e)
-    }
-  }
-
-  // ─── Logging ──────────────────────────────────────────────────
-
-  function logEvent(cmd) {
-    const time = new Date().toLocaleTimeString()
-    let detail = ''
-    if (cmd.type === 'render') detail = `${cmd.action} frame ${cmd.frame_index} ${cmd.facing}`
-    else if (cmd.type === 'bubble') detail = `${cmd.kind}: "${cmd.text}"`
-    else if (cmd.type === 'audio') detail = `${cmd.format} ${cmd.audio_bytes?.length || 0}B`
-    else detail = JSON.stringify(cmd).slice(0, 60)
-
-    logs = [{ time, type: cmd.type, detail }, ...logs].slice(0, 50)
-  }
+  setupLogListener()
 
   // ─── Actions ──────────────────────────────────────────────────
 
@@ -196,57 +71,50 @@
     loading = true
     error = ''
     try {
+      // Load pet data from backend
       const result = await loadPet(petId, apiProvider)
-      const config = result.config
-      petConfig = config
-      configRef = config
-
-      const bytes = new Uint8Array(result.spritesheetBytes)
-      const blob = new Blob([bytes], { type: 'image/webp' })
-      spritesheetUrl = URL.createObjectURL(blob)
-
-      const img = new Image()
-      img.onload = () => {
-        spriteImage = img
-        renderAction = 'idle'
-        renderFrame = 0
-        renderFacing = 'right'
-        startRenderLoop()
-      }
-      img.src = spritesheetUrl
-
+      petConfig = result.config
       loaded = true
-      currentAction = 'idle'
-      currentFrame = 0
+
+      // Wait for Svelte to render the canvas element
+      await tick()
+
+      // Create renderer and apply the loaded result
+      renderer = new PetRenderer(canvasEl)
+      renderer.onRender = (action, frame, facing) => {
+        currentAction = action
+        currentFrame = frame
+        facingLeft = facing === 'left'
+      }
+      renderer.onBubble = (text, kind) => {
+        bubble = { text, kind }
+      }
+      renderer.onBubbleDismiss = () => {
+        bubble = null
+      }
+      renderer.onStats = (s, mood) => {
+        stats = s
+        moodLabel = mood
+      }
+      await renderer.load(result)
       refreshDownloadedPets()
-      startStatsPolling()
     } catch (e) {
-      const msg = typeof e === 'string' ? e : e?.message || JSON.stringify(e)
-      error = msg
+      error = typeof e === 'string' ? e : e?.message || JSON.stringify(e)
     } finally {
       loading = false
     }
   }
 
   async function handleUnload() {
-    try {
-      await unloadPet()
-    } catch (_) {}
+    renderer?.dispose()
+    renderer = null
     loaded = false
     petConfig = null
-    configRef = null
-    spriteImage = null
-    stopRenderLoop()
-    if (spritesheetUrl) {
-      URL.revokeObjectURL(spritesheetUrl)
-    }
-    spritesheetUrl = ''
     error = ''
     currentAction = 'idle'
     currentFrame = 0
     facingLeft = false
-    clearBubble()
-    stopStatsPolling()
+    bubble = null
   }
 
   async function handlePlayAction(action) {
@@ -276,8 +144,8 @@
     try {
       await playSequence({
         steps: [
-          { action: 'click', waitForComplete: true, delayMs: 0 },
-          { action: 'special', waitForComplete: true, delayMs: 200 },
+          { action: 'waving', waitForComplete: true, delayMs: 0 },
+          { action: 'jumping', waitForComplete: true, delayMs: 200 },
           { action: 'idle', waitForComplete: false, delayMs: 0 },
         ],
         repeat: { type: 'once' },
@@ -307,40 +175,15 @@
     try { triggerEvent({ type: 'drag_drop' }) } catch (_) {}
   }
 
-  // ─── Stats Polling ────────────────────────────────────────────
-
-  function startStatsPolling() {
-    stopStatsPolling()
-    statsInterval = setInterval(async () => {
-      try {
-        const s = await getStats()
-        stats = s
-        const score = s.happiness * 0.4 + s.energy * 0.2 + s.social * 0.3 - s.boredom * 0.1
-        if (score >= 80) moodLabel = 'ecstatic'
-        else if (score >= 60) moodLabel = 'happy'
-        else if (score >= 40) moodLabel = 'neutral'
-        else if (score >= 20) moodLabel = 'sad'
-        else moodLabel = 'depressed'
-      } catch (_) {}
-    }, 2000)
-  }
-
-  function stopStatsPolling() {
-    if (statsInterval) {
-      clearInterval(statsInterval)
-      statsInterval = null
-    }
-  }
-
   // ─── Keyboard Shortcuts ───────────────────────────────────────
 
   function onKeydown(e) {
     if (e.target.tagName === 'INPUT') return
     if (!loaded) return
     if (e.key === '1') handlePlayAction('idle')
-    else if (e.key === '2') handlePlayAction('walk')
-    else if (e.key === '3') handlePlayAction('click')
-    else if (e.key === '4') handlePlayAction('special')
+    else if (e.key === '2') handlePlayAction('running_right')
+    else if (e.key === '3') handlePlayAction('waving')
+    else if (e.key === '4') handlePlayAction('jumping')
   }
 </script>
 
@@ -392,9 +235,7 @@
   <div class="pet-area" class:empty={!loaded}>
     {#if loaded}
       {#if bubble}
-        <div class="bubble {bubble.kind}">
-          {bubble.text}
-        </div>
+        <div class="bubble {bubble.kind}">{bubble.text}</div>
       {/if}
       <!-- svelte-ignore a11y_no_interactive_element_to_noninteractive_role -->
       <canvas
@@ -418,9 +259,9 @@
     <div class="controls">
       <div class="control-group">
         <button class="btn" onclick={() => handlePlayAction('idle')}>Idle</button>
-        <button class="btn" onclick={() => handlePlayAction('walk')}>Walk</button>
-        <button class="btn" onclick={() => handlePlayAction('click')}>Click</button>
-        <button class="btn" onclick={() => handlePlayAction('special')}>Special</button>
+        <button class="btn" onclick={() => handlePlayAction('running_right')}>Run</button>
+        <button class="btn" onclick={() => handlePlayAction('waving')}>Wave</button>
+        <button class="btn" onclick={() => handlePlayAction('jumping')}>Jump</button>
         <button class="btn" onclick={handlePlaySequence}>Sequence</button>
       </div>
       <div class="divider"></div>

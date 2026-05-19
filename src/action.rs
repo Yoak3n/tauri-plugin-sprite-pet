@@ -191,7 +191,7 @@ mod tests {
     fn test_action_registry() {
         let registry = ActionRegistry::default_registry();
         assert!(registry.get("idle").is_some());
-        assert!(registry.get("walk").is_some());
+        assert!(registry.get("running_right").is_some());
         assert!(registry.get("nonexistent").is_none());
         assert_eq!(registry.get_by_row(0).unwrap().name, "idle");
     }
@@ -220,12 +220,13 @@ mod tests {
     #[test]
     fn test_action_player_no_loop() {
         let registry = ActionRegistry::default_registry();
-        let mut player = ActionPlayer::new("click");
-        for _ in 0..8 {
+        let mut player = ActionPlayer::new("waving");
+        // waving: 4 frames at 100ms, non-looping
+        for _ in 0..4 {
             player.tick(100, &registry);
         }
         assert!(player.finished);
-        assert_eq!(player.current_frame, 7);
+        assert_eq!(player.current_frame, 3);
     }
 
     #[test]
@@ -233,39 +234,40 @@ mod tests {
         let registry = ActionRegistry::default_registry();
         let mut player = ActionPlayer::new("idle");
         player.tick(120, &registry);
-        assert!(player.switch_to("walk", &registry));
-        assert_eq!(player.current_action, "walk");
+        assert!(player.switch_to("running_right", &registry));
+        assert_eq!(player.current_action, "running_right");
         assert_eq!(player.current_frame, 0);
     }
 
     #[test]
     fn test_action_player_cannot_interrupt() {
         let registry = ActionRegistry::default_registry();
-        let mut player = ActionPlayer::new("drag");
+        let mut player = ActionPlayer::new("running_left");
+        // running_left is non-interruptible
         player.tick(80, &registry);
         assert!(!player.switch_to("idle", &registry));
-        assert_eq!(player.current_action, "drag");
+        assert_eq!(player.current_action, "running_left");
     }
 
     #[test]
     fn test_loop_rest_holds_last_frame() {
         let registry = ActionRegistry::default_registry();
         let mut player = ActionPlayer::new("idle");
-        // Advance to last frame (frame 7)
-        for _ in 0..7 {
+        // idle: 6 frames at 120ms, last frame is 5
+        for _ in 0..5 {
             player.tick(120, &registry);
         }
-        assert_eq!(player.current_frame, 7);
+        assert_eq!(player.current_frame, 5);
         assert_eq!(player.loop_rest_remaining_ms, 0);
 
         // Next tick should trigger loop rest (idle has 500ms rest)
         player.tick(120, &registry);
-        assert_eq!(player.current_frame, 7); // Still at last frame
+        assert_eq!(player.current_frame, 5); // Still at last frame
         assert_eq!(player.loop_rest_remaining_ms, 500);
 
         // During rest, frame doesn't change
         assert!(!player.tick(200, &registry));
-        assert_eq!(player.current_frame, 7);
+        assert_eq!(player.current_frame, 5);
         assert_eq!(player.loop_rest_remaining_ms, 300);
 
         // Rest expires, wraps to frame 0
@@ -279,14 +281,14 @@ mod tests {
         let registry = ActionRegistry::default_registry();
         let mut player = ActionPlayer::new("idle");
         // Advance to last frame and trigger rest
-        for _ in 0..7 {
+        for _ in 0..5 {
             player.tick(120, &registry);
         }
         player.tick(120, &registry);
         assert!(player.loop_rest_remaining_ms > 0);
 
         // Switch to another action should reset rest
-        player.switch_to("walk", &registry);
+        player.switch_to("running_right", &registry);
         assert_eq!(player.loop_rest_remaining_ms, 0);
         assert_eq!(player.current_frame, 0);
     }
@@ -294,9 +296,9 @@ mod tests {
     #[test]
     fn test_no_loop_rest_when_none() {
         let registry = ActionRegistry::default_registry();
-        let mut player = ActionPlayer::new("walk");
-        // walk has loop_rest_ms: None, so it should wrap immediately
-        for _ in 0..8 {
+        let mut player = ActionPlayer::new("running_right");
+        // running_right: 9 frames at 100ms, loop_rest_ms: None
+        for _ in 0..9 {
             player.tick(100, &registry);
         }
         // Should have wrapped to frame 0 without rest
@@ -308,13 +310,12 @@ mod tests {
     #[test]
     fn test_non_looping_finishes_at_last_frame() {
         let registry = ActionRegistry::default_registry();
-        let mut player = ActionPlayer::new("click");
-        // click is non-looping with 8 frames at 100ms
-        // 7 ticks advance to frame 7, 8th tick would overshoot and set finished
-        for _ in 0..8 {
+        let mut player = ActionPlayer::new("waving");
+        // waving is non-looping with 4 frames at 100ms
+        for _ in 0..4 {
             player.tick(100, &registry);
         }
-        assert_eq!(player.current_frame, 7);
+        assert_eq!(player.current_frame, 3);
         assert!(player.finished);
     }
 }

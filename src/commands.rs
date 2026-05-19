@@ -2,8 +2,10 @@ use crate::audio::{AzureTts, ElevenLabsTts};
 use crate::bubble::{BubbleContent, BubblePriority};
 use crate::desktop::PetPluginState;
 use crate::models::{
-    ActionSequence, AudioFormat, BehaviorConfig, BubbleKind, LoadPetResult, PetConfig, PetEvent,
-    PetSnapshot, PetStats, SequenceStep};
+    ActionDef, ActionSequence, AudioFormat, BehaviorConfig, BubbleKind, LoadPetResult,
+    MoodConfig, PetConfig, PetEvent, PetListResponse, PetMeta, PetSnapshot, PetStats,
+    PetState, PositionInfo, SequenceStep,
+};
 use crate::resource::{ResourceClient, ResourceConfig, ResourceProvider};
 use crate::runtime::{start_pet, PetRuntimeConfig};
 use tauri::{command, AppHandle, Emitter, Manager, Runtime};
@@ -488,4 +490,126 @@ pub(crate) async fn list_downloaded_pets(
 ) -> crate::Result<Vec<PetConfig>> {
     let state = app.state::<PetPluginState>();
     state.resource.list_cached_pets().await
+}
+
+// ─── Query ────────────────────────────────────────────────────────────
+
+#[command]
+pub(crate) async fn get_state(
+    app: AppHandle<impl Runtime>,
+) -> crate::Result<PetState> {
+    let state = app.state::<PetPluginState>();
+    let handle_guard = state.handle.read().await;
+    if let Some(ref handle) = *handle_guard {
+        Ok(handle.current_state().await)
+    } else {
+        Err(crate::error::Error::Runtime("No pet loaded".into()))
+    }
+}
+
+#[command]
+pub(crate) async fn get_pet_meta(
+    app: AppHandle<impl Runtime>,
+) -> crate::Result<PetMeta> {
+    let state = app.state::<PetPluginState>();
+    let meta = state.current_pet.read().await;
+    meta.clone()
+        .ok_or_else(|| crate::error::Error::Runtime("No pet loaded".into()))
+}
+
+#[command]
+pub(crate) async fn get_actions(
+    app: AppHandle<impl Runtime>,
+) -> crate::Result<Vec<ActionDef>> {
+    let state = app.state::<PetPluginState>();
+    let handle_guard = state.handle.read().await;
+    if let Some(ref handle) = *handle_guard {
+        Ok(handle.get_actions().await)
+    } else {
+        Err(crate::error::Error::Runtime("No pet loaded".into()))
+    }
+}
+
+#[command]
+pub(crate) async fn get_position(
+    app: AppHandle<impl Runtime>,
+) -> crate::Result<PositionInfo> {
+    let state = app.state::<PetPluginState>();
+    let handle_guard = state.handle.read().await;
+    if let Some(ref handle) = *handle_guard {
+        Ok(handle.get_position().await)
+    } else {
+        Err(crate::error::Error::Runtime("No pet loaded".into()))
+    }
+}
+
+#[command]
+pub(crate) async fn list_remote_pets(
+    app: AppHandle<impl Runtime>,
+    page: Option<u32>,
+    page_size: Option<u32>,
+) -> crate::Result<PetListResponse> {
+    let state = app.state::<PetPluginState>();
+    state.resource.list_pets(page.unwrap_or(1), page_size.unwrap_or(20)).await
+}
+
+#[command]
+pub(crate) async fn search_remote_pets(
+    app: AppHandle<impl Runtime>,
+    query: String,
+    page: Option<u32>,
+    page_size: Option<u32>,
+) -> crate::Result<PetListResponse> {
+    let state = app.state::<PetPluginState>();
+    state.resource.search_pets(&query, page.unwrap_or(1), page_size.unwrap_or(20)).await
+}
+
+// ─── Mutation ─────────────────────────────────────────────────────────
+
+#[command]
+pub(crate) async fn delete_saved_state(
+    pet_id: String,
+) -> crate::Result<()> {
+    let store = crate::mood::PetStore::default_store();
+    store.delete(&pet_id)
+}
+
+#[command]
+pub(crate) async fn clear_cache(
+    app: AppHandle<impl Runtime>,
+    pet_id: Option<String>,
+) -> crate::Result<()> {
+    let state = app.state::<PetPluginState>();
+    state.resource.clear_cache(pet_id.as_deref()).await
+}
+
+#[command]
+pub(crate) async fn set_mood_config(
+    app: AppHandle<impl Runtime>,
+    config: MoodConfig,
+) -> crate::Result<()> {
+    let state = app.state::<PetPluginState>();
+    let handle_guard = state.handle.read().await;
+    if let Some(ref handle) = *handle_guard {
+        handle.set_mood_config(config);
+        Ok(())
+    } else {
+        Err(crate::error::Error::Runtime("No pet loaded".into()))
+    }
+}
+
+#[command]
+pub(crate) async fn set_event_binding(
+    app: AppHandle<impl Runtime>,
+    event_key: String,
+    action: String,
+) -> crate::Result<()> {
+    let state = app.state::<PetPluginState>();
+    let handle_guard = state.handle.read().await;
+    if let Some(ref handle) = *handle_guard {
+        handle.set_event_binding(event_key, action);
+        Ok(())
+    } else {
+        Err(crate::error::Error::Runtime("No pet loaded".into()))
+    }
 }

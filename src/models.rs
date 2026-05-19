@@ -235,6 +235,15 @@ pub enum PetCommand {
     },
 }
 
+/// Position and facing info returned by get_position.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PositionInfo {
+    pub x: f64,
+    pub y: f64,
+    pub facing: Facing,
+}
+
 /// Pet mood stats.
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]

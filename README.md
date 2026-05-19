@@ -52,37 +52,240 @@ Add `sprite-pet:default` to your app's capabilities:
 
 ## Quick Start
 
+### PetRenderer (Recommended)
+
+`PetRenderer` is a high-level class that manages the full lifecycle: loading the pet, processing the spritesheet, listening for render commands, and drawing automatically.
+
 ```typescript
-import {
-  loadPet, unloadPet, playAction, say, showBubble, dismissBubble,
-  triggerEvent, setAmbientEnabled, getStats, playSequence,
-} from 'tauri-plugin-sprite-pet-api'
-import { listen } from '@tauri-apps/api/event'
+import { PetRenderer, playAction, say, showBubble } from 'tauri-plugin-sprite-pet-api'
 
-// Load a pet from codex-pets.net (default)
-const result = await loadPet('her-os1')
+const canvas = document.getElementById('pet-canvas') as HTMLCanvasElement
+const renderer = new PetRenderer(canvas)
 
-// Or load from codexpet.xyz
-const result = await loadPet('endminguga', 'https://codexpet.xyz')
+// Load a pet — this handles everything:
+// - Calls loadPet on the backend
+// - Loads the spritesheet image from bytes
+// - Subscribes to pet://command events
+// - Draws frames automatically on render events
+// - Polls mood stats periodically
+await renderer.load('her-os1')
 
-// Listen for render commands and draw to canvas
-await listen('pet://command', (event) => {
-  const cmd = event.payload
-  if (cmd.type === 'render') {
-    // Draw frame from spritesheet
-    drawSpriteFrame(cmd.action, cmd.frame_index, cmd.facing)
-  }
-})
+// Optional: subscribe to lifecycle callbacks
+renderer.onRender = (action, frame, facing) => {
+  console.log(`${action} frame ${frame} facing ${facing}`)
+}
+renderer.onBubble = (text, kind) => {
+  console.log(`${kind}: ${text}`)
+}
+renderer.onStats = (stats, moodLabel) => {
+  console.log(`Mood: ${moodLabel}`, stats)
+}
 
 // Trigger animations
-await playAction('click')
-await playAction('walk')
-await playAction('special')
+await playAction('waving')
+await playAction('jumping')
 
 // Show speech bubbles
 await say('Hello!')
 await showBubble('Thinking...', 'thought', 3000)
-await dismissBubble()
+
+// Cleanup when done
+renderer.dispose()
+```
+
+### Lower-Level API
+
+For more control, use the individual functions directly:
+
+```typescript
+import {
+  loadPet, unloadPet, playAction, say, showBubble, dismissBubble,
+  triggerEvent, setAmbientEnabled, getStats, playSequence,
+  drawFrame, createSpriteRenderer,
+} from 'tauri-plugin-sprite-pet-api'
+import { listen } from '@tauri-apps/api/event'
+
+// Load a pet
+const result = await loadPet('her-os1')
+
+// Option A: Use drawFrame directly
+const img = new Image()
+const blob = new Blob([new Uint8Array(result.spritesheetBytes)])
+img.src = URL.createObjectURL(blob)
+img.onload = () => {
+  const canvas = document.getElementById('pet-canvas') as HTMLCanvasElement
+  drawFrame(canvas, img, result.config, 'idle', 0, 'right')
+}
+
+// Option B: Use createSpriteRenderer for managed rendering
+const canvas = document.getElementById('pet-canvas') as HTMLCanvasElement
+const renderer = createSpriteRenderer(canvas, result)
+await listen('pet://command', (event) => {
+  const cmd = event.payload
+  if (cmd.type === 'render') {
+    renderer.handleCommand(cmd)
+    renderer.draw(cmd.action, cmd.frame_index, cmd.facing)
+  }
+})
+```
+
+## Rust Backend Usage
+
+The crate can also be used directly from Rust code as a library, without going through Tauri commands. This is useful for custom backends, headless operation, or integrating the pet into non-Tauri Rust applications.
+
+### Download & Configure Pets
+
+```rust
+use tauri_plugin_sprite_pet::{
+    ResourceClient, ResourceConfig, ResourceProvider,
+    ActionRegistry, EventActionMap, PetRuntimeConfig,
+    start_pet,
+};
+
+// Create a resource client
+let config = ResourceConfig {
+    api_base_url: "https://codex-pets.net".into(),
+    provider: ResourceProvider::CodexPets,
+    ..ResourceConfig::default()
+};
+let client = ResourceClient::new(config)?;
+
+// Fetch pet metadata
+let meta = client.get_pet("her-os1").await?;
+println!("Pet: {} ({})", meta.display_name, meta.id);
+
+// Download spritesheet
+let path = client.fetch_spritesheet(&meta.id, &meta.spritesheet_url).await?;
+
+// Search for pets
+let results = client.search_pets("anime", 1, 10).await?;
+println!("Found {} pets", results.total);
+```
+
+### Define Custom Animations
+
+```rust
+use tauri_plugin_sprite_pet::{ActionRegistry, ActionPlayer, models::ActionDef};
+
+// Create from default actions
+let registry = ActionRegistry::default_registry();
+
+// Or define custom actions
+let registry = ActionRegistry::new(vec![
+    ActionDef {
+        name: "dance".into(),
+        row: 0,
+        frame_count: 8,
+        frame_duration_ms: 100,
+        looping: true,
+        interruptible: true,
+        loop_rest_ms: Some(200),
+        last_frame_hold_ms: None,
+    },
+    ActionDef {
+        name: "attack".into(),
+        row: 1,
+        frame_count: 6,
+        frame_duration_ms: 80,
+        looping: false,
+        interruptible: false,
+        loop_rest_ms: None,
+        last_frame_hold_ms: Some(500),
+    },
+]);
+
+// Simulate animation frames
+let mut player = ActionPlayer::new("dance");
+let frame_changed = player.tick(100, &registry); // advance by 100ms
+println!("Action: {}, Frame: {}, Finished: {}",
+    player.current_action, player.current_frame, player.finished);
+```
+
+### Control the Runtime Directly
+
+```rust
+use tauri_plugin_sprite_pet::{
+    start_pet, PetRuntimeConfig, PetHandle,
+    EventActionMap, BehaviorConfig, MoodConfig,
+    models::{PetEvent, Facing},
+};
+
+// Build runtime config
+let runtime_config = PetRuntimeConfig {
+    action_registry: ActionRegistry::default_registry(),
+    event_map: EventActionMap::default_map(),
+    behavior_config: Some(BehaviorConfig::default()),
+    mood_config: Some(MoodConfig::default()),
+    initial_stats: None,
+    sound_registry: None,
+};
+
+// Start the pet runtime (returns a handle for control)
+let handle: PetHandle = start_pet("my-pet".into(), spritesheet, runtime_config);
+
+// Interact with the pet
+handle.send_event(PetEvent::Click);
+handle.send_event(PetEvent::Walk { direction: Facing::Left });
+handle.set_position(100.0, 200.0);
+
+// Show bubbles
+handle.show_bubble(BubbleContent::speech("Hello from Rust!"));
+
+// Query state
+let state = handle.current_state().await;
+println!("{} is {} (mood: {})", state.pet_id, state.action, state.mood_label);
+
+// Get position
+let pos = handle.get_position().await;
+println!("Position: ({}, {}), facing {:?}", pos.x, pos.y, pos.facing);
+
+// Get available actions
+let actions = handle.get_actions().await;
+for action in &actions {
+    println!("  {}: {} frames, {}ms", action.name, action.frame_count, action.frame_duration_ms);
+}
+
+// Update behavior at runtime
+handle.set_behavior_config(custom_behavior_config);
+handle.set_mood_config(custom_mood_config);
+handle.set_event_binding("click".into(), "jumping".into());
+
+// Shutdown
+handle.shutdown();
+```
+
+### Standalone Components
+
+Each subsystem can be used independently:
+
+```rust
+use tauri_plugin_sprite_pet::{
+    BehaviorEngine, MoodTracker, EventActionMap,
+    BubbleManager, BubbleContent,
+    SequenceExecutor,
+    models::{BehaviorConfig, MoodConfig, PetStats, PetEvent},
+};
+
+// Behavior engine - autonomous actions
+let mut behavior = BehaviorEngine::new(BehaviorConfig::default());
+let stats = PetStats::default();
+if let Some(tick) = behavior.tick(&stats) {
+    println!("Ambient action: {}", tick.action);
+}
+
+// Mood tracking
+let mut mood = MoodTracker::new(PetStats::default(), MoodConfig::default());
+mood.on_interaction(); // boost mood on user interaction
+mood.tick(); // decay stats over time
+
+// Event mapping
+let mut event_map = EventActionMap::default_map();
+event_map.bind("click", "jumping"); // customize event-to-action mapping
+
+// Bubble queue with priority
+let mut bubbles = BubbleManager::new();
+bubbles.show(BubbleContent::speech("Hello").with_duration(3000));
+bubbles.show(BubbleContent::system("Important!")); // high priority, interrupts
 ```
 
 ## Resource Providers
@@ -118,15 +321,15 @@ The plugin expects sprite sheets organized as a grid:
 
 | Row | Action | Frames | Loop | Frame Duration | Notes |
 |-----|--------|--------|------|---------------|-------|
-| 0 | idle | 8 | yes | 120ms | 500ms rest at last frame |
-| 1 | walk | 8 | yes | 100ms | - |
-| 2 | drag | 8 | yes | 80ms | Not interruptible |
-| 3 | drop | 8 | no | 100ms | 200ms hold on last frame |
-| 4 | click | 8 | no | 100ms | 300ms hold on last frame |
-| 5 | double_click | 8 | no | 100ms | 200ms hold on last frame |
-| 6 | sleep | 8 | yes | 200ms | - |
-| 7 | wake | 8 | no | 120ms | 400ms hold on last frame |
-| 8 | special | 8 | no | 100ms | 300ms hold on last frame |
+| 0 | idle | 6 | yes | 120ms | 500ms rest at last frame |
+| 1 | running_right | 9 | yes | 100ms | - |
+| 2 | running_left | 9 | yes | 80ms | Not interruptible |
+| 3 | waving | 4 | no | 100ms | 200ms hold on last frame |
+| 4 | jumping | 5 | no | 100ms | 300ms hold on last frame |
+| 5 | failed | 9 | no | 100ms | 200ms hold on last frame |
+| 6 | waiting | 6 | yes | 200ms | - |
+| 7 | running | 6 | no | 120ms | 400ms hold on last frame |
+| 8 | review | 6 | no | 100ms | 300ms hold on last frame |
 
 Frame counts are auto-detected, so sprite sheets with fewer frames per row work correctly.
 
@@ -147,6 +350,109 @@ Returns `{ config: PetConfig, spritesheetBytes: number[] }`.
 
 Unload the current pet, save its state, and stop the runtime.
 
+### Rendering
+
+#### `PetRenderer` class (Recommended)
+
+High-level renderer that manages the full pet lifecycle: load → process spritesheet → listen for render commands → draw automatically.
+
+```typescript
+import { PetRenderer } from 'tauri-plugin-sprite-pet-api'
+
+const renderer = new PetRenderer(canvas)
+
+// Simple: load from pet ID
+await renderer.load('her-os1')
+
+// Or two-step: load pet first, then apply to renderer
+// (useful when you need the config before the canvas is in the DOM)
+const result = await loadPet('her-os1')
+petConfig = result.config
+loaded = true
+await tick() // wait for canvas to render
+const renderer = new PetRenderer(canvas)
+await renderer.load(result) // pass existing result
+
+// Optional callbacks
+renderer.onRender = (action, frame, facing) => { /* ... */ }
+renderer.onBubble = (text, kind) => { /* ... */ }
+renderer.onBubbleDismiss = () => { /* ... */ }
+renderer.onStats = (stats, moodLabel) => { /* ... */ }
+
+// Cleanup
+renderer.dispose()
+```
+
+`PetRenderer` properties and methods:
+
+| Member | Type | Description |
+|--------|------|-------------|
+| `action` | `string` | Current action name |
+| `frame` | `number` | Current frame index |
+| `facing` | `'left' \| 'right'` | Current facing direction |
+| `bubble` | `string \| null` | Current bubble text |
+| `stats` | `PetStats` | Current mood stats |
+| `moodLabel` | `string` | Computed mood label |
+| `ready` | `boolean` | Whether a pet is loaded |
+| `load(petIdOrResult, apiBaseUrl?)` | `Promise<LoadPetResult>` | Load a pet and start rendering. Accepts a pet ID string or an existing `LoadPetResult`. |
+| `draw(action, frame, facing)` | `void` | Manually draw a frame |
+| `playAction(action, loops?)` | `Promise<void>` | Play an action animation |
+| `say(text, kind?)` | `Promise<void>` | Show a speech bubble |
+| `showBubble(text, kind?, durationMs?, typing?)` | `Promise<void>` | Show a bubble with full control |
+| `dismissBubble()` | `Promise<void>` | Dismiss the current bubble |
+| `setAmbientEnabled(enabled)` | `Promise<void>` | Toggle ambient behavior |
+| `playSequence(sequence)` | `Promise<void>` | Play an action sequence |
+| `getConfig()` | `PetConfig \| null` | Get the loaded pet config |
+| `getImage()` | `HTMLImageElement \| null` | Get the spritesheet image |
+| `dispose()` | `void` | Clean up all resources |
+
+#### `drawFrame(canvas, image, config, action, frame, facing): void`
+
+Draw a single sprite frame onto a canvas. This is a standalone utility function.
+
+```typescript
+import { drawFrame } from 'tauri-plugin-sprite-pet-api'
+
+drawFrame(canvas, image, config, 'idle', 0, 'right')
+```
+
+#### `createSpriteRenderer(canvas, loadResult): SpriteRenderer`
+
+Lower-level renderer that manages the spritesheet image. Requires manual event handling.
+
+```typescript
+import { createSpriteRenderer, loadPet } from 'tauri-plugin-sprite-pet-api'
+import { listen } from '@tauri-apps/api/event'
+
+const result = await loadPet('her-os1')
+const renderer = createSpriteRenderer(canvas, result)
+
+// Auto-draw on render commands
+await listen('pet://command', (e) => {
+  if (e.payload.type === 'render') {
+    renderer.handleCommand(e.payload)
+    renderer.draw(e.payload.action, e.payload.frame_index, e.payload.facing)
+  }
+})
+
+// Cleanup when done
+renderer.dispose()
+```
+
+`SpriteRenderer` methods:
+
+| Method | Description |
+|--------|-------------|
+| `draw(action, frame, facing)` | Draw a specific frame |
+| `handleCommand(cmd)` | Update state from a `pet://command` render payload |
+| `startLoop()` | Start a `requestAnimationFrame` render loop |
+| `stopLoop()` | Stop the render loop |
+| `dispose()` | Stop loop and revoke object URL |
+| `ready` | Whether the image is loaded |
+| `config` | The `PetConfig` |
+| `image` | The `HTMLImageElement` |
+| `image` | The `HTMLImageElement` |
+
 ### Animation
 
 #### `playAction(action: string, loops?: number): Promise<void>`
@@ -154,8 +460,8 @@ Unload the current pet, save its state, and stop the runtime.
 Play a specific action animation.
 
 ```typescript
-await playAction('click')      // Play once
-await playAction('walk', 3)    // Play 3 loops
+await playAction('idle')      // Play once
+await playAction('waving', 3) // Play 3 loops
 ```
 
 #### `playSequence(sequence: ActionSequence): Promise<void>`
@@ -165,8 +471,8 @@ Play a choreographed sequence of actions.
 ```typescript
 await playSequence({
   steps: [
-    { action: 'click', waitForComplete: true, delayMs: 0 },
-    { action: 'special', waitForComplete: true, delayMs: 200 },
+    { action: 'waving', waitForComplete: true, delayMs: 0 },
+    { action: 'jumping', waitForComplete: true, delayMs: 200 },
     { action: 'idle', waitForComplete: false, delayMs: 0 },
   ],
   repeat: { type: 'once' },
@@ -227,6 +533,18 @@ Override the pet's mood stats.
 
 Update the behavior engine configuration (idle timeout, ambient intervals, action weights).
 
+#### `setMoodConfig(config: MoodConfig): Promise<void>`
+
+Update the mood decay configuration at runtime.
+
+#### `setEventBinding(eventKey: string, action: string): Promise<void>`
+
+Customize an event-to-action binding. For example, make clicks trigger jumping instead of the default:
+
+```typescript
+await setEventBinding('click', 'jumping')
+```
+
 ### Audio & TTS
 
 #### `registerSound(action: string, path: string, volume?: number): Promise<void>`
@@ -254,6 +572,40 @@ Load a previously saved pet state.
 #### `listDownloadedPets(): Promise<PetConfig[]>`
 
 List all previously downloaded pets from local cache.
+
+#### `deleteSavedState(petId: string): Promise<void>`
+
+Delete a previously saved pet state from disk.
+
+#### `clearCache(petId?: string): Promise<void>`
+
+Clear the local cache for a specific pet or all pets.
+
+### Query
+
+#### `getState(): Promise<PetState>`
+
+Get the full current pet state (action, frame, position, facing, bubble, stats, mood).
+
+#### `getPetMeta(): Promise<PetMeta>`
+
+Get the current pet's metadata (name, description, owner, stats, tags, etc.).
+
+#### `getActions(): Promise<ActionDef[]>`
+
+Get the list of available animation actions for the current pet.
+
+#### `getPosition(): Promise<PositionInfo>`
+
+Get the current position and facing direction.
+
+#### `listRemotePets(page?, pageSize?): Promise<PetListResponse>`
+
+List pets from the remote API (paginated).
+
+#### `searchRemotePets(query, page?, pageSize?): Promise<PetListResponse>`
+
+Search pets on the remote API by query string.
 
 ## Events
 
@@ -284,8 +636,8 @@ Fired when a pet is unloaded. Payload: `{ petId: string }`.
 See `examples/tauri-app/` for a complete working demo with:
 
 - Pet loading from both resource providers
-- Canvas-based sprite rendering
-- Action buttons and keyboard shortcuts (1=idle, 2=walk, 3=click, 4=special)
+- Canvas-based sprite rendering with `createSpriteRenderer`
+- Action buttons and keyboard shortcuts
 - Drag interaction
 - Speech bubbles
 - Mood stats display
