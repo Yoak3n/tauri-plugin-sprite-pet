@@ -4,6 +4,11 @@ A Tauri v2 plugin for animated sprite pet desktop companions. Renders sprite she
 
 ## Installation
 
+### Tauri (Setup quickly)
+```bash
+cargo tauri add sprite-pet
+```
+
 ### Rust (Cargo.toml)
 
 ```toml

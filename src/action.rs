@@ -3,15 +3,15 @@ use std::collections::HashMap;
 
 fn default_actions() -> Vec<ActionDef> {
     vec![
-        ActionDef { name: "idle".into(),         row: 0, frame_count: 8, frame_duration_ms: 120, looping: true,  interruptible: true,  loop_rest_ms: Some(500), last_frame_hold_ms: None },
-        ActionDef { name: "walk".into(),         row: 1, frame_count: 8, frame_duration_ms: 100, looping: true,  interruptible: true,  loop_rest_ms: None,      last_frame_hold_ms: None },
-        ActionDef { name: "drag".into(),         row: 2, frame_count: 8, frame_duration_ms: 80,  looping: true,  interruptible: false, loop_rest_ms: None,      last_frame_hold_ms: None },
-        ActionDef { name: "drop".into(),         row: 3, frame_count: 8, frame_duration_ms: 100, looping: false, interruptible: true,  loop_rest_ms: None,      last_frame_hold_ms: Some(200) },
-        ActionDef { name: "click".into(),        row: 4, frame_count: 8, frame_duration_ms: 100, looping: false, interruptible: true,  loop_rest_ms: None,      last_frame_hold_ms: Some(300) },
-        ActionDef { name: "double_click".into(), row: 5, frame_count: 8, frame_duration_ms: 100, looping: false, interruptible: true,  loop_rest_ms: None,      last_frame_hold_ms: Some(200) },
-        ActionDef { name: "sleep".into(),        row: 6, frame_count: 8, frame_duration_ms: 200, looping: true,  interruptible: true,  loop_rest_ms: None,      last_frame_hold_ms: None },
-        ActionDef { name: "wake".into(),         row: 7, frame_count: 8, frame_duration_ms: 120, looping: false, interruptible: true,  loop_rest_ms: None,      last_frame_hold_ms: Some(400) },
-        ActionDef { name: "special".into(),      row: 8, frame_count: 8, frame_duration_ms: 100, looping: false, interruptible: true,  loop_rest_ms: None,      last_frame_hold_ms: Some(300) },
+        ActionDef { name: "idle".into(),         row: 0, frame_count: 6, frame_duration_ms: 120, looping: true,  interruptible: true,  loop_rest_ms: Some(500), last_frame_hold_ms: None },
+        ActionDef { name: "running_right".into(),         row: 1, frame_count: 9, frame_duration_ms: 100, looping: true,  interruptible: true,  loop_rest_ms: None,      last_frame_hold_ms: None },
+        ActionDef { name: "running_left".into(),         row: 2, frame_count: 9, frame_duration_ms: 80,  looping: true,  interruptible: false, loop_rest_ms: None,      last_frame_hold_ms: None },
+        ActionDef { name: "waving".into(),         row: 3, frame_count: 4, frame_duration_ms: 100, looping: false, interruptible: true,  loop_rest_ms: None,      last_frame_hold_ms: Some(200) },
+        ActionDef { name: "jumping".into(),        row: 4, frame_count: 5, frame_duration_ms: 100, looping: false, interruptible: true,  loop_rest_ms: None,      last_frame_hold_ms: Some(300) },
+        ActionDef { name: "failed".into(), row: 5, frame_count: 9, frame_duration_ms: 100, looping: false, interruptible: true,  loop_rest_ms: None,      last_frame_hold_ms: Some(200) },
+        ActionDef { name: "waiting".into(),        row: 6, frame_count: 6, frame_duration_ms: 200, looping: true,  interruptible: true,  loop_rest_ms: None,      last_frame_hold_ms: None },
+        ActionDef { name: "running".into(),         row: 7, frame_count: 6, frame_duration_ms: 120, looping: false, interruptible: true,  loop_rest_ms: None,      last_frame_hold_ms: Some(400) },
+        ActionDef { name: "review".into(),      row: 8, frame_count: 6, frame_duration_ms: 100, looping: false, interruptible: true,  loop_rest_ms: None,      last_frame_hold_ms: Some(300) },
     ]
 }
 
