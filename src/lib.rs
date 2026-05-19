@@ -20,6 +20,7 @@ pub mod error;
 pub mod event;
 mod models;
 pub mod mood;
+pub mod pet;
 pub mod resource;
 pub mod runtime;
 pub mod sprite;
@@ -35,6 +36,7 @@ pub use bubble::{BubbleContent, BubbleManager, BubblePriority};
 pub use choreography::SequenceExecutor;
 pub use event::EventActionMap;
 pub use mood::{MoodTracker, PetStore};
+pub use pet::{Pet, PetBuilder};
 pub use resource::{ResourceClient, ResourceConfig, ResourceProvider};
 pub use runtime::{start_pet, PetHandle, PetRuntimeConfig, SharedPetState};
 

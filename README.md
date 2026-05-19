@@ -131,18 +131,83 @@ await listen('pet://command', (event) => {
 
 ## Rust Backend Usage
 
-The crate can also be used directly from Rust code as a library, without going through Tauri commands. This is useful for custom backends, headless operation, or integrating the pet into non-Tauri Rust applications.
+The crate can be used directly from Rust code as a library, without going through Tauri commands. This is useful for custom backends, headless operation, or integrating the pet into non-Tauri Rust applications.
 
-### Download & Configure Pets
+### Pet (Recommended)
+
+The `Pet` struct wraps the entire workflow — resource download, validation, runtime start — into a single call.
 
 ```rust
-use tauri_plugin_sprite_pet::{
-    ResourceClient, ResourceConfig, ResourceProvider,
-    ActionRegistry, EventActionMap, PetRuntimeConfig,
-    start_pet,
-};
+use tauri_plugin_sprite_pet::{Pet, PetStats};
 
-// Create a resource client
+// Simplest: load from default provider (codex-pets.net)
+let pet = Pet::start("her-os1").await?;
+
+// Interact
+pet.say("Hello!");
+pet.play("waving");
+pet.think("What should I do?");
+pet.send_event(PetEvent::Click);
+pet.set_position(100.0, 200.0);
+
+// Query
+let state = pet.state().await;
+println!("{} is {} (mood: {})", state.pet_id, state.action, state.mood_label);
+
+let (x, y, facing) = pet.position().await;
+let actions = pet.actions().await;
+
+// Configure
+pet.set_ambient_enabled(true);
+pet.set_stats(PetStats { happiness: 100, energy: 80, ..Default::default() });
+
+// Save & shutdown
+pet.save();
+pet.shutdown();
+```
+
+#### Builder Pattern
+
+Use `Pet::builder()` for custom options:
+
+```rust
+use tauri_plugin_sprite_pet::{Pet, FrameLayout, BehaviorConfig, MoodConfig};
+
+// Custom API provider
+let pet = Pet::builder("endminguga")
+    .api_url("https://codexpet.xyz")
+    .start()
+    .await?;
+
+// Custom sprite layout
+let pet = Pet::builder("my-pet")
+    .layout(FrameLayout { columns: 6, rows: 4, cell_width: 128, cell_height: 128 })
+    .start()
+    .await?;
+
+// Full customization
+let pet = Pet::builder("her-os1")
+    .api_url("https://codex-pets.net")
+    .behavior_config(BehaviorConfig {
+        idle_timeout_ms: 5000,
+        ..Default::default()
+    })
+    .mood_config(MoodConfig {
+        decay_interval_ms: 60000,
+        ..Default::default()
+    })
+    .initial_stats(PetStats { happiness: 100, ..Default::default() })
+    .start()
+    .await?;
+```
+
+### Resource Client
+
+For direct resource access without starting a runtime:
+
+```rust
+use tauri_plugin_sprite_pet::{ResourceClient, ResourceConfig, ResourceProvider};
+
 let config = ResourceConfig {
     api_base_url: "https://codex-pets.net".into(),
     provider: ResourceProvider::CodexPets,
@@ -201,7 +266,9 @@ println!("Action: {}, Frame: {}, Finished: {}",
     player.current_action, player.current_frame, player.finished);
 ```
 
-### Control the Runtime Directly
+### Control the Runtime Directly (Low-Level)
+
+For full control over the runtime, use `start_pet` directly. Most users should prefer [`Pet`](#pet-recommended) instead.
 
 ```rust
 use tauri_plugin_sprite_pet::{
