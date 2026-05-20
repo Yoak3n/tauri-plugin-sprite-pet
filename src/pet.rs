@@ -51,7 +51,7 @@ impl Pet {
         PetBuilder {
             pet_id: pet_id.to_string(),
             provider: None,
-            local_spritesheet: None,
+            local_dir: None,
             display_name: None,
             layout: None,
             action_registry: None,
@@ -243,14 +243,15 @@ impl Pet {
 /// # }
 /// ```
 ///
-/// # From a local spritesheet file
+/// # From a local directory
 ///
 /// ```rust,no_run
 /// use tauri_plugin_sprite_pet::Pet;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// // Directory should contain a spritesheet image (any webp/png/jpg)
 /// let pet = Pet::builder("my-pet")
-///     .local("./assets/my-pet.webp")
+///     .local("./assets/my-pet")
 ///     .display_name("My Pet")
 ///     .start()
 ///     .await?;
@@ -260,7 +261,7 @@ impl Pet {
 pub struct PetBuilder {
     pet_id: String,
     provider: Option<ResourceProvider>,
-    local_spritesheet: Option<PathBuf>,
+    local_dir: Option<PathBuf>,
     display_name: Option<String>,
     layout: Option<FrameLayout>,
     action_registry: Option<ActionRegistry>,
@@ -289,11 +290,15 @@ impl PetBuilder {
         self
     }
 
-    /// Load spritesheet from a local file path instead of downloading.
+    /// Load pet from a local directory instead of downloading.
+    ///
+    /// The directory should contain a spritesheet image (webp/png/jpg).
+    /// If a `pet.json` config exists in the directory, it will be loaded.
+    /// After starting, the config will be generated/saved to the directory.
     ///
     /// When set, the pet starts entirely offline — no network requests are made.
-    pub fn local(mut self, path: impl Into<PathBuf>) -> Self {
-        self.local_spritesheet = Some(path.into());
+    pub fn local(mut self, dir: impl Into<PathBuf>) -> Self {
+        self.local_dir = Some(dir.into());
         self
     }
 
@@ -341,11 +346,13 @@ impl PetBuilder {
 
         // ── Resolve spritesheet path and metadata ──────────────────
         let (path, meta, spritesheet_abs_path, client) =
-            if let Some(local_path) = &self.local_spritesheet {
-                // Local mode: no network, minimal metadata
-                let abs = std::fs::canonicalize(local_path)?;
+            if let Some(local_dir) = &self.local_dir {
+                // Local mode: scan directory for image file
+                let spritesheet_path = find_spritesheet_in_dir(local_dir)?;
+                let abs = std::fs::canonicalize(&spritesheet_path)?;
                 let display_name = self
                     .display_name
+                    .clone()
                     .unwrap_or_else(|| self.pet_id.clone());
                 let meta = PetMeta {
                     id: self.pet_id.clone(),
@@ -392,9 +399,14 @@ impl PetBuilder {
             actions: action_registry.action_defs(),
         };
 
-        // Persist config to cache (remote mode only)
+        // Persist config
         if let Some(ref c) = client {
             c.save_config(&self.pet_id, &pet_config).await?;
+        } else if let Some(local_dir) = &self.local_dir {
+            // Save pet.json alongside the spritesheet
+            let config_path = local_dir.join("pet.json");
+            let json = serde_json::to_string_pretty(&pet_config)?;
+            tokio::fs::write(&config_path, json).await?;
         }
 
         // ── Try to load saved state ────────────────────────────────
@@ -421,4 +433,29 @@ impl PetBuilder {
             config: pet_config,
         })
     }
+}
+
+/// Scan a directory for the first image file (webp/png/jpg/jpeg/gif/bmp).
+fn find_spritesheet_in_dir(dir: &PathBuf) -> crate::Result<PathBuf> {
+    let image_extensions = ["webp", "png", "jpg", "jpeg", "gif", "bmp"];
+    let mut entries: Vec<_> = std::fs::read_dir(dir)?
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_type().map(|t| t.is_file()).unwrap_or(false))
+        .collect();
+
+    // Sort for deterministic order
+    entries.sort_by_key(|e| e.file_name());
+
+    for entry in &entries {
+        if let Some(ext) = entry.path().extension().and_then(|e| e.to_str()) {
+            if image_extensions.contains(&ext.to_lowercase().as_str()) {
+                return Ok(entry.path());
+            }
+        }
+    }
+
+    Err(crate::error::Error::Io(std::io::Error::new(
+        std::io::ErrorKind::NotFound,
+        format!("No image file found in {}", dir.display()),
+    )))
 }
