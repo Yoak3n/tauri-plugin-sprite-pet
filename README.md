@@ -130,6 +130,64 @@ await listen('pet://command', (event) => {
 })
 ```
 
+## Runtime Flow
+
+The plugin operates as a backend-driven animation system. The Rust runtime owns all game logic; the frontend is a dumb renderer that draws frames on command.
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                        Tauri Frontend                            │
+│                                                                  │
+│  loadPet(petId)  ──────────────────────────────────────►         │
+│                                                                  │
+│  ◄── LoadPetResult { config, spritesheetBytes }                  │
+│                                                                  │
+│  PetRenderer.load()                                              │
+│    ├── decode spritesheet bytes → HTMLImageElement               │
+│    ├── subscribe to pet://command events                         │
+│    └── start render loop                                         │
+│                                                                  │
+│  pet://command { type: "render", action, frame, facing }         │
+│    └── drawFrame(canvas, image, config, action, frame, facing)   │
+│                                                                  │
+│  pet://command { type: "bubble", text, kind }                    │
+│  pet://command { type: "dismiss_bubble" }                        │
+│  pet://command { type: "audio", audio_bytes, format }            │
+└───────────────────────────────┬──────────────────────────────────┘
+                                │
+                         Tauri IPC (invoke + events)
+                                │
+┌───────────────────────────────▼──────────────────────────────────┐
+│                        Rust Backend                              │
+│                                                                  │
+│  Pet::builder(petId)                                             │
+│    ├── Fetch metadata from API / scan local directory            │
+│    ├── Download & cache spritesheet (or use local file)          │
+│    ├── Validate spritesheet (dimensions, transparency)           │
+│    ├── Detect frame counts per row                               │
+│    ├── Build ActionRegistry                                      │
+│    ├── Save sprite-pet.json to cache dir (skip if unchanged)     │
+│    └── Start runtime loop                                        │
+│                                                                  │
+│  Runtime Loop (background task)                                  │
+│    ├── BehaviorEngine → ambient actions on idle timeout          │
+│    ├── MoodTracker → decay stats over time                       │
+│    ├── ActionPlayer → advance animation frames                   │
+│    ├── BubbleManager → queue & dismiss speech bubbles            │
+│    └── EventDispatcher → emit pet://command to frontend          │
+│                                                                  │
+│  State Persistence                                               │
+│    ├── sprite-pet.json  → layout, actions, spritesheet path      │
+│    └── PetStore         → mood stats, saved between sessions     │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### Key Design Decisions
+
+- **Backend-driven rendering**: The runtime emits `render` commands at the correct frame rate. The frontend only draws — it has no animation logic of its own.
+- **Config caching**: `sprite-pet.json` is written to the system cache directory (`%LOCALAPPDATA%/sprite-pet/` on Windows, `~/Library/Caches/sprite-pet/` on macOS). Writes are skipped when the content is unchanged to avoid unnecessary IO and dev-mode hot reload.
+- **Local mode**: `Pet::builder("my-pet").local("./sprites/")` loads from a directory instead of downloading. The spritesheet is read from the source directory; the config is cached outside the project tree.
+
 ## Rust Backend Usage
 
 The crate can be used directly from Rust code as a library, without going through Tauri commands. This is useful for custom backends, headless operation, or integrating the pet into non-Tauri Rust applications.
@@ -717,22 +775,31 @@ Fired when a pet is successfully loaded. Payload is the `PetConfig`.
 
 Fired when a pet is unloaded. Payload: `{ petId: string }`.
 
-## Example
+## Examples
 
-See `examples/tauri-app/` for a complete working demo with:
+### `examples/minimum` — Svelte + PetRenderer
 
-- Pet loading from both resource providers
-- Canvas-based sprite rendering with `createSpriteRenderer`
-- Action buttons and keyboard shortcuts
-- Drag interaction
-- Speech bubbles
-- Mood stats display
-- Ambient behavior toggle
+Minimal demo using the high-level `PetRenderer` API. Registers the plugin via `tauri_plugin_sprite_pet::init()` with no custom Rust commands.
 
-Run the example:
+- Svelte 5 + Vite
+- `PetRenderer` handles the full lifecycle automatically
+- Pet loading, action buttons, drag, bubbles, mood stats, ambient toggle
+- Downloaded pet picker (cached pets)
+
+### `examples/advanced` — Vue + Custom Rust Commands
+
+Full-control demo using custom Rust commands and the `Pet` builder API directly. Shows how to manage pet lifecycle from the Rust side and bridge events to the frontend.
+
+- Vue 3 + TypeScript + Vite
+- Custom `load_pet` / `unload_pet` Tauri commands wrapping `Pet::builder().start()`
+- `pet.bridge_to_tauri(&app)` forwards runtime events to the frontend
+- Manual `drawFrame` rendering (no `PetRenderer`)
+- Remote API provider selection (codex-pets.net / codexpet.xyz)
+
+Run either example:
 
 ```bash
-cd examples/tauri-app
+cd examples/minimum   # or examples/advanced
 pnpm install
 pnpm tauri dev
 ```
