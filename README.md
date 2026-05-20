@@ -13,6 +13,7 @@ cargo tauri add sprite-pet
 
 ```toml
 [dependencies]
+# Should use latest version
 tauri-plugin-sprite-pet = "0.1"
 ```
 
