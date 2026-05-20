@@ -48,20 +48,73 @@ pub(crate) async fn load_pet<R: Runtime>(
         };
         ResourceClient::new(config)?
     } else {
-        // Use a clone of the stored client's config to create a new client
-        // (avoids holding the lock across await)
         ResourceClient::new(state.resource.config().clone())?
     };
 
-    // Fetch pet metadata
+    // ── Try cache-first ───────────────────────────────────────────
+    let cached_config_path = resource.cache_dir().join(&pet_id).join("sprite-pet.json");
+    if let Ok(json) = tokio::fs::read_to_string(&cached_config_path).await {
+        if let Ok(cached) = serde_json::from_str::<PetConfig>(&json) {
+            let spritesheet = std::path::PathBuf::from(&cached.spritesheet_path);
+            if spritesheet.exists() {
+                if let Ok(hash) = crate::resource::file_crc32(&spritesheet) {
+                    if hash == cached.spritesheet_hash {
+                        // Cache hit — skip API, validation, frame detection
+                        let spritesheet_bytes = tokio::fs::read(&spritesheet).await?;
+                        let layout = cached.layout.clone();
+                        let action_registry =
+                            crate::action::ActionRegistry::new(cached.actions.clone());
+                        let (_, sheet) =
+                            crate::sprite::load_spritesheet(&spritesheet, layout)?;
+
+                        let store = crate::mood::PetStore::default_store();
+                        let saved = store.load(&pet_id).unwrap_or(None);
+                        let initial_stats = saved.as_ref().map(|s| s.stats.clone());
+
+                        let sound_registry = {
+                            let mut reg = state.sound_registry.write().await;
+                            std::mem::take(&mut *reg)
+                        };
+
+                        let runtime_config = PetRuntimeConfig {
+                            action_registry,
+                            event_map: crate::event::EventActionMap::default_map(),
+                            behavior_config: Some(BehaviorConfig::default()),
+                            mood_config: Some(crate::models::MoodConfig::default()),
+                            initial_stats,
+                            sound_registry: Some(sound_registry),
+                        };
+
+                        let handle = start_pet(pet_id.clone(), sheet, runtime_config);
+
+                        let mut command_rx = handle.subscribe_commands();
+                        let app_handle = app.clone();
+                        tokio::spawn(async move {
+                            while let Ok(cmd) = command_rx.recv().await {
+                                let _ = app_handle.emit("pet://command", &cmd);
+                            }
+                        });
+
+                        *state.handle.write().await = Some(handle);
+
+                        let _ = app.emit("pet://loaded", &cached);
+
+                        return Ok(LoadPetResult {
+                            config: cached,
+                            spritesheet_bytes,
+                        });
+                    }
+                }
+                // Hash mismatch — delete corrupted file
+                let _ = tokio::fs::remove_file(&spritesheet).await;
+            }
+        }
+    }
+
+    // ── Full flow ─────────────────────────────────────────────────
     let pet_meta = resource.get_pet(&pet_id).await?;
+    let path = resource.fetch_spritesheet(&pet_id).await?;
 
-    // Download spritesheet
-    let path = resource
-        .fetch_spritesheet(&pet_id)
-        .await?;
-
-    // Load and validate
     let layout = crate::models::FrameLayout::default();
     let (img, sheet) = crate::sprite::load_spritesheet(&path, layout.clone())?;
 
@@ -74,11 +127,9 @@ pub(crate) async fn load_pet<R: Runtime>(
         ));
     }
 
-    // Detect actual frame counts per row from the sprite sheet
     let row_frame_counts = crate::sprite::detect_frame_counts(&img, &layout);
     let action_registry = crate::action::ActionRegistry::with_detected_frames(&row_frame_counts);
 
-    // Build and persist pet config
     let spritesheet_abs = resource.spritesheet_abs_path(&pet_id);
     let spritesheet_bytes = tokio::fs::read(&path).await?;
     let spritesheet_hash = crate::resource::file_crc32(&path)?;
@@ -93,18 +144,15 @@ pub(crate) async fn load_pet<R: Runtime>(
     };
     resource.save_config(&pet_id, &pet_config).await?;
 
-    // Try to load saved state
     let store = crate::mood::PetStore::default_store();
     let saved = store.load(&pet_id).unwrap_or(None);
     let initial_stats = saved.as_ref().map(|s| s.stats.clone());
 
-    // Take the sound registry from plugin state
     let sound_registry = {
         let mut reg = state.sound_registry.write().await;
         std::mem::take(&mut *reg)
     };
 
-    // Create runtime config with detected frame counts
     let runtime_config = PetRuntimeConfig {
         action_registry,
         event_map: crate::event::EventActionMap::default_map(),
@@ -116,7 +164,6 @@ pub(crate) async fn load_pet<R: Runtime>(
 
     let handle = start_pet(pet_id.clone(), sheet, runtime_config);
 
-    // Subscribe to PetCommand stream and bridge to Tauri events
     let mut command_rx = handle.subscribe_commands();
     let app_handle = app.clone();
     tokio::spawn(async move {
@@ -125,7 +172,6 @@ pub(crate) async fn load_pet<R: Runtime>(
         }
     });
 
-    // Store handle
     *state.handle.write().await = Some(handle);
     *state.current_pet.write().await = Some(pet_meta);
 
