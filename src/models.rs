@@ -122,6 +122,36 @@ pub struct PetMeta {
     pub validation_report: Option<ValidationReport>,
 }
 
+impl PetMeta {
+    /// Create an empty PetMeta with default values. Useful for local/offline mode.
+    pub fn empty() -> Self {
+        Self {
+            id: String::new(),
+            display_name: String::new(),
+            description: String::new(),
+            spritesheet_path: String::new(),
+            kind: PetKind::default(),
+            owner_id: String::new(),
+            owner_handle: String::new(),
+            owner_name: String::new(),
+            uploaded_at: String::new(),
+            view_count: 0,
+            download_count: 0,
+            like_count: 0,
+            comment_count: 0,
+            liked_by_me: false,
+            owner_shadowbanned: false,
+            tags: Vec::new(),
+            spritesheet_url: String::new(),
+            poster_url: String::new(),
+            preview_url: String::new(),
+            share_image_url: String::new(),
+            download_url: String::new(),
+            validation_report: None,
+        }
+    }
+}
+
 /// Paginated API response for pet listing.
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
