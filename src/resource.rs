@@ -284,7 +284,7 @@ impl ResourceClient {
 
     /// Get the cache path for a pet's config file.
     pub fn cached_config_path(&self, pet_id: &str) -> PathBuf {
-        self.config.cache_dir.join(pet_id).join("pet.json")
+        self.config.cache_dir.join(pet_id).join("sprite-pet.json")
     }
 
     /// Get the absolute path to the cached spritesheet as a string.
@@ -294,13 +294,20 @@ impl ResourceClient {
             .into_owned()
     }
 
-    /// Save a pet config to disk.
+    /// Save a pet config to disk, skipping the write if the content is unchanged.
     pub async fn save_config(&self, pet_id: &str, config: &PetConfig) -> Result<()> {
         let path = self.cached_config_path(pet_id);
+        let json = serde_json::to_string_pretty(config)?;
+        if path.exists() {
+            if let Ok(existing) = tokio::fs::read_to_string(&path).await {
+                if existing == json {
+                    return Ok(());
+                }
+            }
+        }
         if let Some(parent) = path.parent() {
             tokio::fs::create_dir_all(parent).await?;
         }
-        let json = serde_json::to_string_pretty(config)?;
         tokio::fs::write(&path, json).await?;
         Ok(())
     }
@@ -317,7 +324,7 @@ impl ResourceClient {
         Ok(Some(config))
     }
 
-    /// List all downloaded pets by scanning the cache directory for pet.json files.
+    /// List all downloaded pets by scanning the cache directory for sprite-pet.json files.
     pub async fn list_cached_pets(&self) -> Result<Vec<PetConfig>> {
         let cache_dir = &self.config.cache_dir;
         if !cache_dir.exists() {
@@ -326,7 +333,7 @@ impl ResourceClient {
         let mut pets = Vec::new();
         let mut entries = tokio::fs::read_dir(cache_dir).await?;
         while let Some(entry) = entries.next_entry().await? {
-            let config_path = entry.path().join("pet.json");
+            let config_path = entry.path().join("sprite-pet.json");
             if config_path.exists() {
                 if let Ok(json) = tokio::fs::read_to_string(&config_path).await {
                     if let Ok(config) = serde_json::from_str::<PetConfig>(&json) {

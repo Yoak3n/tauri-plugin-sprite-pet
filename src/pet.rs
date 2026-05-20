@@ -293,8 +293,9 @@ impl PetBuilder {
     /// Load pet from a local directory instead of downloading.
     ///
     /// The directory should contain a spritesheet image (webp/png/jpg).
-    /// If a `pet.json` config exists in the directory, it will be loaded.
-    /// After starting, the config will be generated/saved to the directory.
+    /// If a `sprite-pet.json` config exists in the directory, it will be loaded.
+    /// After starting, the config is cached under the system cache directory
+    /// (not in the source directory) to avoid triggering dev-mode hot reload.
     ///
     /// When set, the pet starts entirely offline — no network requests are made.
     pub fn local(mut self, dir: impl Into<PathBuf>) -> Self {
@@ -402,11 +403,21 @@ impl PetBuilder {
         // Persist config
         if let Some(ref c) = client {
             c.save_config(&self.pet_id, &pet_config).await?;
-        } else if let Some(local_dir) = &self.local_dir {
-            // Save pet.json alongside the spritesheet
-            let config_path = local_dir.join("pet.json");
+        } else if self.local_dir.is_some() {
+            // Save sprite-pet.json to cache dir (not the source tree) to avoid hot-reload
+            let cache_dir = dirs::cache_dir()
+                .unwrap_or_else(|| PathBuf::from("."))
+                .join("sprite-pet")
+                .join(&self.pet_id);
+            let config_path = cache_dir.join("sprite-pet.json");
             let json = serde_json::to_string_pretty(&pet_config)?;
-            tokio::fs::write(&config_path, json).await?;
+            match tokio::fs::read_to_string(&config_path).await {
+                Ok(existing) if existing == json => {}
+                _ => {
+                    tokio::fs::create_dir_all(&cache_dir).await?;
+                    tokio::fs::write(&config_path, json).await?;
+                }
+            }
         }
 
         // ── Try to load saved state ────────────────────────────────

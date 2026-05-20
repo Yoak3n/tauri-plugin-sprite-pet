@@ -3,19 +3,20 @@ import { ref, onMounted, onUnmounted, nextTick } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { drawFrame } from "tauri-plugin-sprite-pet-api";
+import type { PetConfig, LoadPetResult }  from "tauri-plugin-sprite-pet-api";
 
-interface PetConfig {
-  id: string;
-  displayName: string;
-  spritesheetPath: string;
-  layout: { columns: number; rows: number; cellWidth: number; cellHeight: number };
-  actions: Array<{ name: string; row: number; frameCount: number; frameDurationMs: number; looping: boolean; interruptible: boolean }>;
-}
+// interface PetConfig {
+//   id: string;
+//   displayName: string;
+//   spritesheetPath: string;
+//   layout: { columns: number; rows: number; cellWidth: number; cellHeight: number };
+//   actions: Array<{ name: string; row: number; frameCount: number; frameDurationMs: number; looping: boolean; interruptible: boolean }>;
+// }
 
-interface LoadResult {
-  config: PetConfig;
-  spritesheet_bytes: number[];
-}
+// interface LoadResult {
+//   config: PetConfig;
+//   spritesheet_bytes: number[];
+// }
 
 // ─── State ──────────────────────────────────────────────────────
 
@@ -101,7 +102,7 @@ async function handleLoad() {
   error.value = "";
   try {
     // 1) Backend: Pet::start() downloads, validates, starts runtime, returns config + bytes
-    const result = await invoke<LoadResult>("load_pet", {
+    const result = await invoke<LoadPetResult>("load_pet", {
       petId: id,
       apiUrl: apiUrl.value,
     });
@@ -113,7 +114,7 @@ async function handleLoad() {
     await nextTick();
 
     // 3) Load spritesheet image from bytes returned by backend
-    const blob = new Blob([new Uint8Array(result.spritesheet_bytes)]);
+    const blob = new Blob([new Uint8Array(result.spritesheetBytes)]);
     const blobUrl = URL.createObjectURL(blob);
 
     await new Promise<void>((resolve, reject) => {

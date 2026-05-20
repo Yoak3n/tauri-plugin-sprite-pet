@@ -235,7 +235,7 @@ pub enum AudioFormat {
     Mp3,
 }
 
-/// Config persisted to pet.json — describes a downloaded pet's spritesheet layout and actions.
+/// Config persisted to sprite-pet.json — describes a downloaded pet's spritesheet layout and actions.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PetConfig {
@@ -251,7 +251,7 @@ pub struct PetConfig {
 #[serde(rename_all = "camelCase")]
 pub struct LoadPetResult {
     pub config: PetConfig,
-    /// Raw spritesheet image bytes (WebP). Sent once on load, not persisted in pet.json.
+    /// Raw spritesheet image bytes (WebP). Sent once on load, not persisted in sprite-pet.json.
     pub spritesheet_bytes: Vec<u8>,
 }
 
