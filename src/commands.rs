@@ -13,9 +13,9 @@ use tauri::{command, AppHandle, Emitter, Manager, Runtime};
 /// Detect the resource provider from a URL.
 fn detect_provider(url: &str) -> ResourceProvider {
     if url.contains("codexpet.xyz") {
-        ResourceProvider::CodexpetXyz
+        ResourceProvider::codexpet_xyz()
     } else {
-        ResourceProvider::CodexPets
+        ResourceProvider::custom(url)
     }
 }
 
@@ -41,13 +41,11 @@ pub(crate) async fn load_pet<R: Runtime>(
     // If a custom API URL is provided, create a temporary client for this request
     let resource = if let Some(ref url) = api_base_url {
         let provider = detect_provider(url);
-        let mut config = ResourceConfig {
-            api_base_url: url.clone(),
+        let config = ResourceConfig {
             provider,
+            cache_dir: state.resource.cache_dir(),
             ..ResourceConfig::default()
         };
-        // Use the same cache directory as the main client
-        config.cache_dir = state.resource.cache_dir();
         ResourceClient::new(config)?
     } else {
         // Use a clone of the stored client's config to create a new client
@@ -60,7 +58,7 @@ pub(crate) async fn load_pet<R: Runtime>(
 
     // Download spritesheet
     let path = resource
-        .fetch_spritesheet(&pet_id, &pet_meta.spritesheet_url)
+        .fetch_spritesheet(&pet_id)
         .await?;
 
     // Load and validate

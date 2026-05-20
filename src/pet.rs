@@ -6,6 +6,7 @@ use crate::resource::{ResourceClient, ResourceConfig, ResourceProvider};
 use crate::runtime::{start_pet, PetHandle, PetRuntimeConfig};
 use crate::sprite::load_spritesheet;
 use crate::{ActionRegistry, BubbleContent, EventActionMap};
+use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Runtime};
 
@@ -49,7 +50,9 @@ impl Pet {
     pub fn builder(pet_id: &str) -> PetBuilder {
         PetBuilder {
             pet_id: pet_id.to_string(),
-            api_url: None,
+            provider: None,
+            local_spritesheet: None,
+            display_name: None,
             layout: None,
             action_registry: None,
             behavior_config: None,
@@ -226,12 +229,29 @@ impl Pet {
 
 /// Builder for customizing a [`Pet`] before starting.
 ///
+/// # From a remote provider
+///
 /// ```rust,no_run
-/// use tauri_plugin_sprite_pet::{Pet, FrameLayout};
+/// use tauri_plugin_sprite_pet::{Pet, ResourceProvider};
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// let pet = Pet::builder("endminguga")
-///     .api_url("https://codexpet.xyz")
+///     .provider(ResourceProvider::codexpet_xyz())
+///     .start()
+///     .await?;
+/// # Ok(())
+/// # }
+/// ```
+///
+/// # From a local spritesheet file
+///
+/// ```rust,no_run
+/// use tauri_plugin_sprite_pet::Pet;
+///
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// let pet = Pet::builder("my-pet")
+///     .local("./assets/my-pet.webp")
+///     .display_name("My Pet")
 ///     .start()
 ///     .await?;
 /// # Ok(())
@@ -239,7 +259,9 @@ impl Pet {
 /// ```
 pub struct PetBuilder {
     pet_id: String,
-    api_url: Option<String>,
+    provider: Option<ResourceProvider>,
+    local_spritesheet: Option<PathBuf>,
+    display_name: Option<String>,
     layout: Option<FrameLayout>,
     action_registry: Option<ActionRegistry>,
     behavior_config: Option<BehaviorConfig>,
@@ -248,9 +270,38 @@ pub struct PetBuilder {
 }
 
 impl PetBuilder {
-    /// Set the API base URL. Default: `https://codex-pets.net`.
+    /// Set the resource provider. Default: [`ResourceProvider::codex_pets()`].
+    pub fn provider(mut self, provider: ResourceProvider) -> Self {
+        self.provider = Some(provider);
+        self
+    }
+
+    /// Set the API base URL. Auto-detects the provider from the URL.
+    ///
+    /// For full control, use [`provider()`](Self::provider) instead.
     pub fn api_url(mut self, url: &str) -> Self {
-        self.api_url = Some(url.to_string());
+        let p = if url.contains("codexpet.xyz") {
+            ResourceProvider::codexpet_xyz()
+        } else {
+            ResourceProvider::custom(url)
+        };
+        self.provider = Some(p);
+        self
+    }
+
+    /// Load spritesheet from a local file path instead of downloading.
+    ///
+    /// When set, the pet starts entirely offline — no network requests are made.
+    pub fn local(mut self, path: impl Into<PathBuf>) -> Self {
+        self.local_spritesheet = Some(path.into());
+        self
+    }
+
+    /// Set the display name (used when loading from a local file).
+    ///
+    /// When loading from a remote provider, the name is fetched from the API.
+    pub fn display_name(mut self, name: &str) -> Self {
+        self.display_name = Some(name.to_string());
         self
     }
 
@@ -286,35 +337,38 @@ impl PetBuilder {
 
     /// Start the pet with the configured options.
     pub async fn start(self) -> crate::Result<Pet> {
-        let api_url = self
-            .api_url
-            .unwrap_or_else(|| "https://codex-pets.net".to_string());
-        let provider = if api_url.contains("codexpet.xyz") {
-            ResourceProvider::CodexpetXyz
-        } else {
-            ResourceProvider::CodexPets
-        };
-
-        let resource_config = ResourceConfig {
-            api_base_url: api_url,
-            provider,
-            ..ResourceConfig::default()
-        };
-        let client = ResourceClient::new(resource_config)?;
-
-        // Fetch metadata
-        let meta = client.get_pet(&self.pet_id).await?;
-
-        // Download spritesheet
-        let path = client
-            .fetch_spritesheet(&self.pet_id, &meta.spritesheet_url)
-            .await?;
-
-        // Load image for validation and frame detection
         let layout = self.layout.unwrap_or_default();
+
+        // ── Resolve spritesheet path and metadata ──────────────────
+        let (path, meta, spritesheet_abs_path, client) =
+            if let Some(local_path) = &self.local_spritesheet {
+                // Local mode: no network, minimal metadata
+                let abs = std::fs::canonicalize(local_path)?;
+                let display_name = self
+                    .display_name
+                    .unwrap_or_else(|| self.pet_id.clone());
+                let meta = PetMeta {
+                    id: self.pet_id.clone(),
+                    display_name,
+                    ..PetMeta::empty()
+                };
+                (abs.clone(), meta, abs.to_string_lossy().into_owned(), None)
+            } else {
+                // Remote mode: fetch from provider
+                let provider = self.provider.unwrap_or_else(ResourceProvider::codex_pets);
+                let client = ResourceClient::new(ResourceConfig {
+                    provider,
+                    ..ResourceConfig::default()
+                })?;
+                let meta = client.get_pet(&self.pet_id).await?;
+                let path = client.fetch_spritesheet(&self.pet_id).await?;
+                let abs = client.spritesheet_abs_path(&self.pet_id);
+                (path, meta, abs, Some(client))
+            };
+
+        // ── Load image for validation and frame detection ──────────
         let (img, sheet) = load_spritesheet(&path, layout.clone())?;
 
-        // Validate
         let validation_config = crate::validation::ValidationConfig::default();
         let outcome = crate::validation::validate_spritesheet(&img, &validation_config)?;
         if !outcome.valid {
@@ -323,31 +377,34 @@ impl PetBuilder {
             ));
         }
 
-        // Detect frame counts and build action registry
+        // ── Detect frame counts and build action registry ──────────
         let row_frame_counts = crate::sprite::detect_frame_counts(&img, &layout);
         let action_registry = self
             .action_registry
             .unwrap_or_else(|| ActionRegistry::with_detected_frames(&row_frame_counts));
 
-        // Build pet config
-        let actions = action_registry.action_defs();
+        // ── Build pet config ───────────────────────────────────────
         let pet_config = crate::models::PetConfig {
             id: meta.id.clone(),
             display_name: meta.display_name.clone(),
-            spritesheet_path: client.spritesheet_abs_path(&self.pet_id),
+            spritesheet_path: spritesheet_abs_path,
             layout,
-            actions,
+            actions: action_registry.action_defs(),
         };
-        client.save_config(&self.pet_id, &pet_config).await?;
 
-        // Try to load saved state
+        // Persist config to cache (remote mode only)
+        if let Some(ref c) = client {
+            c.save_config(&self.pet_id, &pet_config).await?;
+        }
+
+        // ── Try to load saved state ────────────────────────────────
         let store = crate::mood::PetStore::default_store();
         let saved = store.load(&self.pet_id).unwrap_or(None);
         let initial_stats = self
             .initial_stats
             .or_else(|| saved.as_ref().map(|s| s.stats.clone()));
 
-        // Build runtime config
+        // ── Start runtime ──────────────────────────────────────────
         let runtime_config = PetRuntimeConfig {
             action_registry,
             event_map: EventActionMap::default_map(),
@@ -356,8 +413,6 @@ impl PetBuilder {
             initial_stats,
             sound_registry: None,
         };
-
-        // Start runtime
         let handle = start_pet(self.pet_id.clone(), sheet, runtime_config);
 
         Ok(Pet {
