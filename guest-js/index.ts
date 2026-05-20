@@ -7,6 +7,7 @@ export interface PetConfig {
   id: string
   displayName: string
   spritesheetPath: string
+  spritesheetHash: string
   layout: {
     columns: number
     rows: number

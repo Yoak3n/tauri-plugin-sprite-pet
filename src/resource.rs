@@ -1,8 +1,17 @@
 use crate::error::Result;
 use crate::models::{PetConfig, PetListResponse, PetMeta};
 use serde::Deserialize;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 use std::time::Duration;
+
+/// Global cache root, set once during plugin init.
+static APP_CACHE_DIR: OnceLock<PathBuf> = OnceLock::new();
+
+/// Set the application-scoped cache directory. Called once during plugin init.
+pub(crate) fn set_app_cache_dir(dir: PathBuf) {
+    let _ = APP_CACHE_DIR.set(dir);
+}
 
 /// Response format from the pet metadata API.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -111,15 +120,41 @@ pub struct ResourceConfig {
 
 impl Default for ResourceConfig {
     fn default() -> Self {
-        let cache_dir = dirs::cache_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join("sprite-pet");
         Self {
             provider: ResourceProvider::codex_pets(),
-            cache_dir,
+            cache_dir: cache_dir(),
             request_timeout: Duration::from_secs(30),
         }
     }
+}
+
+/// Cache root directory for the plugin.
+///
+/// When used as a Tauri plugin, this is automatically set to
+/// `{app_local_data_dir}/sprite-pet` (e.g. `%LOCALAPPDATA%/{identifier}/sprite-pet`
+/// on Windows), so each application's cache is isolated.
+///
+/// When used as a standalone library without calling `init()`, falls back to
+/// `{system_cache_dir}/sprite-pet`.
+pub fn cache_dir() -> PathBuf {
+    APP_CACHE_DIR
+        .get()
+        .cloned()
+        .unwrap_or_else(|| {
+            dirs::cache_dir()
+                .unwrap_or_else(|| PathBuf::from("."))
+                .join("sprite-pet")
+        })
+}
+
+/// Cache directory for a specific pet under the default cache root.
+pub fn pet_cache_dir(pet_id: &str) -> PathBuf {
+    cache_dir().join(pet_id)
+}
+
+/// Path to a pet's cached config file (`sprite-pet.json`).
+fn cached_config_path_in(base: &Path, pet_id: &str) -> PathBuf {
+    base.join(pet_id).join("sprite-pet.json")
 }
 
 /// Lightweight struct for deserializing abbreviated pet metadata (codexpet.xyz).
@@ -252,39 +287,44 @@ impl ResourceClient {
 
     /// Download and cache a pet's sprite sheet. Returns the local path.
     pub async fn fetch_spritesheet(&self, pet_id: &str) -> Result<PathBuf> {
-        let dest = self.cached_spritesheet_path(pet_id);
-        if dest.exists() {
-            return Ok(dest);
+        // Check for an existing cached file with any supported extension
+        let pet_dir = self.config.cache_dir.join(pet_id);
+        if let Some(existing) = find_cached_spritesheet(&pet_dir) {
+            return Ok(existing);
         }
 
-        if let Some(parent) = dest.parent() {
+        if let Some(parent) = pet_dir.parent() {
             tokio::fs::create_dir_all(parent).await?;
         }
 
         // Prefer the provider's direct spritesheet URL over the metadata URL
         let url = self.config.provider.spritesheet_url(pet_id);
 
-        let bytes = self
-            .http
-            .get(&url)
-            .send()
-            .await?
-            .error_for_status()?
-            .bytes()
-            .await?;
+        let resp = self.http.get(&url).send().await?.error_for_status()?;
+        let ext = extension_from_content_type(
+            resp.headers()
+                .get(reqwest::header::CONTENT_TYPE)
+                .and_then(|v| v.to_str().ok()),
+        );
+        let bytes = resp.bytes().await?;
 
+        let dest = pet_dir.join(format!("spritesheet.{ext}"));
         tokio::fs::write(&dest, &bytes).await?;
         Ok(dest)
     }
 
     /// Get the cache path for a pet's spritesheet.
+    ///
+    /// Scans the pet's cache directory for an existing file with a supported
+    /// image extension. Falls back to `spritesheet.webp` if none is found.
     pub fn cached_spritesheet_path(&self, pet_id: &str) -> PathBuf {
-        self.config.cache_dir.join(pet_id).join("spritesheet.webp")
+        let pet_dir = self.config.cache_dir.join(pet_id);
+        find_cached_spritesheet(&pet_dir).unwrap_or_else(|| pet_dir.join("spritesheet.webp"))
     }
 
     /// Get the cache path for a pet's config file.
     pub fn cached_config_path(&self, pet_id: &str) -> PathBuf {
-        self.config.cache_dir.join(pet_id).join("sprite-pet.json")
+        cached_config_path_in(&self.config.cache_dir, pet_id)
     }
 
     /// Get the absolute path to the cached spritesheet as a string.
@@ -356,4 +396,40 @@ impl ResourceClient {
         }
         Ok(())
     }
+}
+
+const IMAGE_EXTENSIONS: &[&str] = &["webp", "png", "jpg", "jpeg", "gif", "bmp"];
+
+/// Scan a directory for a cached spritesheet file with any supported image extension.
+fn find_cached_spritesheet(dir: &std::path::Path) -> Option<PathBuf> {
+    if !dir.exists() {
+        return None;
+    }
+    for ext in IMAGE_EXTENSIONS {
+        let path = dir.join(format!("spritesheet.{ext}"));
+        if path.exists() {
+            return Some(path);
+        }
+    }
+    None
+}
+
+/// Map an HTTP Content-Type header to a file extension.
+fn extension_from_content_type(content_type: Option<&str>) -> &'static str {
+    let ct = content_type.unwrap_or("").split(';').next().unwrap_or("").trim();
+    match ct {
+        "image/webp" => "webp",
+        "image/png" => "png",
+        "image/jpeg" => "jpg",
+        "image/gif" => "gif",
+        "image/bmp" => "bmp",
+        _ => "webp",
+    }
+}
+
+/// Compute CRC32 hash of a file's contents. Returns a hex string.
+pub(crate) fn file_crc32(path: &Path) -> std::io::Result<String> {
+    let bytes = std::fs::read(path)?;
+    let hash = crc32fast::hash(&bytes);
+    Ok(format!("{hash:08x}"))
 }

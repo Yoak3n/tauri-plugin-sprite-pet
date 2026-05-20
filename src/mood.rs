@@ -80,10 +80,9 @@ impl PetStore {
     }
 
     pub fn default_store() -> Self {
-        let cache_dir = dirs::cache_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join("sprite-pet");
-        Self { cache_dir }
+        Self {
+            cache_dir: crate::cache_dir(),
+        }
     }
 
     fn snapshot_path(&self, pet_id: &str) -> PathBuf {

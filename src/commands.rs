@@ -81,11 +81,13 @@ pub(crate) async fn load_pet<R: Runtime>(
     // Build and persist pet config
     let spritesheet_abs = resource.spritesheet_abs_path(&pet_id);
     let spritesheet_bytes = tokio::fs::read(&path).await?;
+    let spritesheet_hash = crate::resource::file_crc32(&path)?;
     let actions = action_registry.action_defs();
     let pet_config = PetConfig {
         id: pet_meta.id.clone(),
         display_name: pet_meta.display_name.clone(),
         spritesheet_path: spritesheet_abs,
+        spritesheet_hash,
         layout: layout.clone(),
         actions,
     };

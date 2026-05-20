@@ -37,7 +37,9 @@ pub use choreography::SequenceExecutor;
 pub use event::EventActionMap;
 pub use mood::{MoodTracker, PetStore};
 pub use pet::{Pet, PetBuilder};
-pub use resource::{ResourceClient, ResourceConfig, ResourceProvider, ResponseFormat};
+pub use resource::{
+    cache_dir, pet_cache_dir, ResourceClient, ResourceConfig, ResourceProvider, ResponseFormat,
+};
 pub use runtime::{start_pet, PetHandle, PetRuntimeConfig, SharedPetState};
 
 /// Initializes the plugin.

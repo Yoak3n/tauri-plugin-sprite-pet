@@ -343,9 +343,26 @@ impl PetBuilder {
 
     /// Start the pet with the configured options.
     pub async fn start(self) -> crate::Result<Pet> {
-        let layout = self.layout.unwrap_or_default();
+        let layout = self.layout.clone().unwrap_or_default();
 
-        // ── Resolve spritesheet path and metadata ──────────────────
+        // ── Try cache-first for remote mode ────────────────────────
+        if self.local_dir.is_none() {
+            let cached_config_path = crate::pet_cache_dir(&self.pet_id).join("sprite-pet.json");
+            if let Ok(json) = tokio::fs::read_to_string(&cached_config_path).await {
+                if let Ok(cached) = serde_json::from_str::<crate::models::PetConfig>(&json) {
+                    let spritesheet = std::path::PathBuf::from(&cached.spritesheet_path);
+                    if spritesheet.exists() {
+                        if let Ok(hash) = crate::resource::file_crc32(&spritesheet) {
+                            if hash == cached.spritesheet_hash {
+                                return self.start_from_cache(cached, layout).await;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── Full flow: resolve spritesheet and metadata ────────────
         let (path, meta, spritesheet_abs_path, client) =
             if let Some(local_dir) = &self.local_dir {
                 // Local mode: scan directory for image file
@@ -391,30 +408,28 @@ impl PetBuilder {
             .action_registry
             .unwrap_or_else(|| ActionRegistry::with_detected_frames(&row_frame_counts));
 
-        // ── Build pet config ───────────────────────────────────────
+        // ── Compute spritesheet hash and build config ──────────────
+        let spritesheet_hash = crate::resource::file_crc32(&path)?;
         let pet_config = crate::models::PetConfig {
             id: meta.id.clone(),
             display_name: meta.display_name.clone(),
             spritesheet_path: spritesheet_abs_path,
+            spritesheet_hash,
             layout,
             actions: action_registry.action_defs(),
         };
 
-        // Persist config
+        // Persist config (skip if unchanged)
         if let Some(ref c) = client {
             c.save_config(&self.pet_id, &pet_config).await?;
         } else if self.local_dir.is_some() {
-            // Save sprite-pet.json to cache dir (not the source tree) to avoid hot-reload
-            let cache_dir = dirs::cache_dir()
-                .unwrap_or_else(|| PathBuf::from("."))
-                .join("sprite-pet")
-                .join(&self.pet_id);
-            let config_path = cache_dir.join("sprite-pet.json");
+            let pet_dir = crate::pet_cache_dir(&self.pet_id);
+            let config_path = pet_dir.join("sprite-pet.json");
             let json = serde_json::to_string_pretty(&pet_config)?;
             match tokio::fs::read_to_string(&config_path).await {
                 Ok(existing) if existing == json => {}
                 _ => {
-                    tokio::fs::create_dir_all(&cache_dir).await?;
+                    tokio::fs::create_dir_all(&pet_dir).await?;
                     tokio::fs::write(&config_path, json).await?;
                 }
             }
@@ -442,6 +457,46 @@ impl PetBuilder {
             handle: Arc::new(handle),
             meta,
             config: pet_config,
+        })
+    }
+
+    /// Fast path: start from a cached config, skipping API calls, image
+    /// validation, and frame detection.
+    async fn start_from_cache(
+        self,
+        cached_config: crate::models::PetConfig,
+        layout: FrameLayout,
+    ) -> crate::Result<Pet> {
+        let spritesheet_path = std::path::PathBuf::from(&cached_config.spritesheet_path);
+        let (_, sheet) = load_spritesheet(&spritesheet_path, layout)?;
+        let action_registry = ActionRegistry::new(cached_config.actions.clone());
+
+        let meta = PetMeta {
+            id: cached_config.id.clone(),
+            display_name: cached_config.display_name.clone(),
+            ..PetMeta::empty()
+        };
+
+        let store = crate::mood::PetStore::default_store();
+        let saved = store.load(&self.pet_id).unwrap_or(None);
+        let initial_stats = self
+            .initial_stats
+            .or_else(|| saved.as_ref().map(|s| s.stats.clone()));
+
+        let runtime_config = PetRuntimeConfig {
+            action_registry,
+            event_map: EventActionMap::default_map(),
+            behavior_config: Some(self.behavior_config.unwrap_or_default()),
+            mood_config: Some(self.mood_config.unwrap_or_default()),
+            initial_stats,
+            sound_registry: None,
+        };
+        let handle = start_pet(self.pet_id.clone(), sheet, runtime_config);
+
+        Ok(Pet {
+            handle: Arc::new(handle),
+            meta,
+            config: cached_config,
         })
     }
 }

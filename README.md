@@ -161,12 +161,10 @@ The plugin operates as a backend-driven animation system. The Rust runtime owns 
 │                        Rust Backend                              │
 │                                                                  │
 │  Pet::builder(petId)                                             │
-│    ├── Fetch metadata from API / scan local directory            │
-│    ├── Download & cache spritesheet (or use local file)          │
-│    ├── Validate spritesheet (dimensions, transparency)           │
-│    ├── Detect frame counts per row                               │
-│    ├── Build ActionRegistry                                      │
-│    ├── Save sprite-pet.json to cache dir (skip if unchanged)     │
+│    ├── [Cache-first] If sprite-pet.json + spritesheet exist      │
+│    │   and CRC32 matches → skip API, validation, frame detection │
+│    ├── Otherwise: fetch metadata, download, validate, detect     │
+│    ├── Save sprite-pet.json (skip if content unchanged)          │
 │    └── Start runtime loop                                        │
 │                                                                  │
 │  Runtime Loop (background task)                                  │
@@ -177,7 +175,7 @@ The plugin operates as a backend-driven animation system. The Rust runtime owns 
 │    └── EventDispatcher → emit pet://command to frontend          │
 │                                                                  │
 │  State Persistence                                               │
-│    ├── sprite-pet.json  → layout, actions, spritesheet path      │
+│    ├── sprite-pet.json  → layout, actions, path, CRC32 hash      │
 │    └── PetStore         → mood stats, saved between sessions     │
 └──────────────────────────────────────────────────────────────────┘
 ```
@@ -185,7 +183,9 @@ The plugin operates as a backend-driven animation system. The Rust runtime owns 
 ### Key Design Decisions
 
 - **Backend-driven rendering**: The runtime emits `render` commands at the correct frame rate. The frontend only draws — it has no animation logic of its own.
-- **Config caching**: `sprite-pet.json` is written to the system cache directory (`%LOCALAPPDATA%/sprite-pet/` on Windows, `~/Library/Caches/sprite-pet/` on macOS). Writes are skipped when the content is unchanged to avoid unnecessary IO and dev-mode hot reload.
+- **Cache-first loading**: On startup, the plugin checks for a cached `sprite-pet.json` and verifies the spritesheet's CRC32 hash. If both match, it skips the API request, image validation, and frame detection entirely.
+- **Config write deduplication**: `sprite-pet.json` is only written when its content actually differs from the existing file, reducing IO and avoiding dev-mode hot reload.
+- **App-scoped cache**: Cache lives under the application's own data directory (e.g. `%LOCALAPPDATA%/{identifier}/sprite-pet` on Windows), so uninstalling the app cleanly removes all cached data.
 - **Local mode**: `Pet::builder("my-pet").local("./sprites/")` loads from a directory instead of downloading. The spritesheet is read from the source directory; the config is cached outside the project tree.
 
 ## Rust Backend Usage

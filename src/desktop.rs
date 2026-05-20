@@ -18,6 +18,10 @@ pub fn init<R: Runtime, C: DeserializeOwned>(
         .unwrap_or_else(|_| std::path::PathBuf::from("."))
         .join("sprite-pet");
 
+    // Make cache_dir() available globally so Pet::builder() and other
+    // standalone APIs use the same app-scoped path.
+    crate::resource::set_app_cache_dir(cache_dir.clone());
+
     let config = ResourceConfig { cache_dir, ..ResourceConfig::default() };
     let resource = ResourceClient::new(config)?;
     Ok(PetPluginState {

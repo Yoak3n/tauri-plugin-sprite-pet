@@ -242,6 +242,7 @@ pub struct PetConfig {
     pub id: String,
     pub display_name: String,
     pub spritesheet_path: String,
+    pub spritesheet_hash: String,
     pub layout: FrameLayout,
     pub actions: Vec<ActionDef>,
 }
