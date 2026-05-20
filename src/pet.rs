@@ -358,6 +358,8 @@ impl PetBuilder {
                             }
                         }
                     }
+                    // Hash mismatch or file missing — delete so fetch_spritesheet re-downloads
+                    let _ = tokio::fs::remove_file(&spritesheet).await;
                 }
             }
         }

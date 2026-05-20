@@ -286,9 +286,12 @@ impl ResourceClient {
     }
 
     /// Download and cache a pet's sprite sheet. Returns the local path.
+    ///
+    /// Returns the cached file immediately if it exists. Integrity is
+    /// verified by the caller (CRC32 hash check in `Pet::start()`).
     pub async fn fetch_spritesheet(&self, pet_id: &str) -> Result<PathBuf> {
-        // Check for an existing cached file with any supported extension
         let pet_dir = self.config.cache_dir.join(pet_id);
+
         if let Some(existing) = find_cached_spritesheet(&pet_dir) {
             return Ok(existing);
         }
@@ -297,9 +300,7 @@ impl ResourceClient {
             tokio::fs::create_dir_all(parent).await?;
         }
 
-        // Prefer the provider's direct spritesheet URL over the metadata URL
         let url = self.config.provider.spritesheet_url(pet_id);
-
         let resp = self.http.get(&url).send().await?.error_for_status()?;
         let ext = extension_from_content_type(
             resp.headers()
